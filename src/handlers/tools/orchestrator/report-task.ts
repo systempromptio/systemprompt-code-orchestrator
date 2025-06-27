@@ -17,7 +17,7 @@ export interface ReportTaskArgs {
 /**
  * Handler for report task tool
  */
-export const handleReportTask = async (args: ReportTaskArgs): Promise<CallToolResult> => {
+export const handleReportTask = async (args: ReportTaskArgs, _context?: any): Promise<CallToolResult> => {
   const {
     task_ids = [],
     report_type = 'summary',

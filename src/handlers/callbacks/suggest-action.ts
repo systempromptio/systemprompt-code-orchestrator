@@ -1,13 +1,11 @@
 import type { CreateMessageResult, TextContent } from '@modelcontextprotocol/sdk/types.js';
 
-import { sendSamplingCompleteNotification } from '../notifications.js';
 import { formatToolResponse } from '../tools/types.js';
 
 
 // Interface for suggested action response
 export interface GeneratedSuggestAction {
   action: string;
-  subreddit?: string;
   reasoning: string;
   content?: string;
   id?: string;
@@ -26,7 +24,7 @@ function isTextContent(content: unknown): content is TextContent {
   );
 }
 
-export async function handleSuggestActionCallback(result: CreateMessageResult, sessionId: string): Promise<string> {
+export async function handleSuggestActionCallback(result: CreateMessageResult, _sessionId: string): Promise<string> {
   try {
     if (!isTextContent(result.content)) {
       throw new Error("Invalid content format received from LLM");
@@ -38,9 +36,8 @@ export async function handleSuggestActionCallback(result: CreateMessageResult, s
       throw new Error("Invalid action data: missing required fields (action or reasoning)");
     }
 
-    const message = `Reddit action suggestion generated: ${actionData.action}`;
+    const message = `Action suggestion generated: ${actionData.action}`;
 
-    await sendSamplingCompleteNotification(message, sessionId);
 
     return JSON.stringify(
       formatToolResponse({

@@ -14,7 +14,6 @@ import express from "express";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
-  CreateMessageRequestSchema,
   ListToolsRequestSchema,
   CallToolRequestSchema,
   ListPromptsRequestSchema,
@@ -26,7 +25,6 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { serverConfig, serverCapabilities } from "../constants/server/server-config.js";
-import { sendSamplingRequest } from "../handlers/sampling.js";
 import { handleListTools, handleToolCall } from "../handlers/tool-handlers.js";
 import { handleListPrompts, handleGetPrompt } from "../handlers/prompt-handlers.js";
 import { handleListResources, handleResourceCall } from "../handlers/resource-handlers.js";
@@ -115,11 +113,6 @@ export class MCPHandler implements IMCPHandler {
       return handleResourceCall(request);
     });
 
-    // Sampling
-    server.setRequestHandler(CreateMessageRequestSchema, (request) => {
-      return sendSamplingRequest(request, { sessionId });
-    });
-
     // Roots
     server.setRequestHandler(ListRootsRequestSchema, (request) => {
       logger.debug(`📁 [${sessionId}] Listing roots`);
@@ -158,12 +151,21 @@ export class MCPHandler implements IMCPHandler {
     const startTime = Date.now();
 
     try {
+      // Log request details for debugging
+      logger.debug(`MCP ${req.method} request`, {
+        headers: req.headers,
+        sessionId: req.headers["mcp-session-id"] || req.headers["x-session-id"],
+        acceptHeader: req.headers.accept,
+      });
+
       // Set CORS headers
       res.header("Access-Control-Expose-Headers", "mcp-session-id, x-session-id");
 
       // Extract session ID from headers
       let sessionId =
         (req.headers["mcp-session-id"] as string) || (req.headers["x-session-id"] as string);
+
+      logger.info(`[SESSION] Request method: ${req.method}, Session ID: ${sessionId || "none"}`);
 
       // For init requests, we need to check the request without a session
       // The transport will handle body parsing
@@ -174,6 +176,7 @@ export class MCPHandler implements IMCPHandler {
       if (isInitRequest) {
         // Create new session for initialization
         sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        logger.info(`[SESSION] Creating new session: ${sessionId}`);
 
         // Create new server instance for this session
         const server = this.createServer(sessionId);
@@ -184,6 +187,8 @@ export class MCPHandler implements IMCPHandler {
           onsessioninitialized: (sid) => {
             logger.info(`🔗 New session initialized: ${sid}`);
           },
+          // Ensure SSE is enabled (default behavior)
+          enableJsonResponse: false, // This ensures SSE is preferred over JSON responses
         });
 
         // Connect server to transport (one-to-one relationship)
@@ -218,6 +223,8 @@ export class MCPHandler implements IMCPHandler {
 
         sessionInfo = this.sessions.get(sessionId);
         if (!sessionInfo) {
+          logger.error(`[SESSION] Session not found: ${sessionId}`);
+          logger.info(`[SESSION] Active sessions: ${Array.from(this.sessions.keys()).join(", ")}`);
           res.status(404).json({
             jsonrpc: "2.0",
             error: {
@@ -229,6 +236,7 @@ export class MCPHandler implements IMCPHandler {
           return;
         }
 
+        logger.info(`[SESSION] Found session ${sessionId}, handling ${req.method} request`);
         sessionInfo.lastAccessed = new Date();
 
         // Let the session's transport handle the request

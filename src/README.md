@@ -1,93 +1,78 @@
-# Reddit MCP Server Source Code
+# SystemPrompt Coding Agent Source Code
 
-This directory contains the source code for the Reddit Model Context Protocol (MCP) server. The server enables AI assistants to interact with Reddit through a standardized protocol.
+This directory contains the source code for the SystemPrompt Coding Agent MCP server. The server orchestrates Claude Code CLI and Gemini CLI sessions to perform complex coding tasks through a standardized protocol.
 
 ## Directory Structure
 
 ### Entry Points
 
 - **`index.ts`** - Main executable entry point for running the server directly
-- **`reddit-mcp-server.ts`** - HTTP server implementation that handles OAuth and hosts MCP endpoints
-- **`smithery-entry.ts`** - Entry point for Smithery platform deployment
+- **`server.ts`** - HTTP server implementation that hosts MCP endpoints
 
 ### Core Directories
 
-#### `/config`
-Configuration management for the MCP server including capabilities and server metadata.
-
 #### `/constants`
-Static definitions for tools, sampling operations, and their schemas. This is where all tool definitions and prompts are centralized.
+Static definitions including server configuration and metadata.
 
 #### `/handlers`
 Request handlers that implement the business logic for:
-- Tool execution (search, read, create content)
-- Sampling operations (AI-assisted content generation)
+- Tool execution (task creation, agent management, status checks)
+- Prompt handling
 - Notifications and progress tracking
 - Resource management
 
 #### `/server`
 HTTP server infrastructure including:
-- OAuth2 authentication flow
 - MCP protocol endpoints
 - Session management
 - Middleware for security and validation
 
 #### `/services`
-External service integrations:
-- Reddit API client with OAuth support
-- SystemPrompt API integration for AI capabilities
+Core service implementations:
+- Agent management (Claude Code and Gemini CLI orchestration)
+- Task management and execution
+- State persistence
+- Process management
 
 #### `/types`
 TypeScript type definitions for:
-- Reddit API data structures
+- Agent interfaces
+- Task structures
 - MCP protocol extensions
 - Internal application types
 
 #### `/utils`
 Utility functions for:
-- Data transformation
-- Validation
 - Logging
-- Error handling
+- Validation
+- Helper functions
 
 ## Architecture Overview
 
-The server follows a layered architecture:
+The SystemPrompt Coding Agent follows a modular architecture:
 
-1. **Entry Layer** - Multiple entry points for different deployment scenarios
-2. **Server Layer** - HTTP server with OAuth and MCP protocol support
-3. **Handler Layer** - Business logic for processing MCP requests
-4. **Service Layer** - External API integrations
-5. **Utility Layer** - Cross-cutting concerns
+1. **MCP Protocol Layer** - Handles communication with AI assistants
+2. **Orchestration Layer** - Manages multiple coding agents
+3. **Task Management** - Tracks and executes coding tasks
+4. **State Persistence** - Maintains task and agent state
 
-## Key Concepts
+## Key Features
 
-### Authentication Flow
-1. User initiates OAuth flow through `/oauth/authorize`
-2. Reddit redirects back with authorization code
-3. Server exchanges code for access token
-4. Token is stored per session for subsequent API calls
-
-### MCP Protocol Implementation
-- Tools allow AI to search, read, and create Reddit content
-- Sampling enables AI-assisted content generation
-- Notifications provide real-time feedback
-- Sessions maintain authentication context
-
-### Multi-Session Support
-The server supports multiple concurrent users, each with their own:
-- Authentication credentials
-- MCP server instance
-- Session state
+- Multi-agent orchestration (Claude Code CLI, Gemini CLI)
+- Task tracking and management
+- State persistence across sessions
+- Real-time progress notifications
+- Structured output handling
 
 ## Development
 
-To understand how the server works:
+Run the server locally:
+```bash
+npm run build
+npm start
+```
 
-1. Start with `index.ts` to see the main entry point
-2. Follow the flow through `reddit-mcp-server.ts` for HTTP setup
-3. Look at `/server/routes.ts` for request routing
-4. Examine `/handlers` for business logic
-5. Check `/services` for Reddit API integration
-
-Each subdirectory contains its own README with more detailed information about its specific functionality.
+For development with hot reload:
+```bash
+npm run watch
+```

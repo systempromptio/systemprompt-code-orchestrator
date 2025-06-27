@@ -8,7 +8,8 @@
  * that implements the full MCP specification including tools, prompts, resources,
  * sampling, and OAuth 2.1 authentication.
  *
- * This serves as a reference implementation for developers building their own MCP servers.
+ * This implementation provides a coding agent orchestrator that manages Claude Code CLI
+ * and Gemini CLI sessions to perform coding tasks.
  *
  * @see {@link https://modelcontextprotocol.io/specification/2025-06-18/server | MCP Server Specification}
  */
@@ -26,45 +27,35 @@ import type { Implementation, ServerCapabilities } from "@modelcontextprotocol/s
  * - Complete MCP specification implementation
  * - Type-safe TypeScript architecture
  * - Production-ready patterns and best practices
- * - OAuth 2.1 authentication flow
- * - Real-world API integration (Reddit)
+ * - Task orchestration for coding agents
+ * - Integration with Claude Code and Gemini CLIs
  */
 export const serverConfig: Implementation = {
-  name: "systemprompt-mcp-server-full",
+  name: "systemprompt-coding-agent",
   version: "1.0.0",
   metadata: {
-    name: "SystemPrompt MCP Server Full Example",
+    name: "SystemPrompt Coding Agent",
     description:
-      "Complete example MCP server implementation demonstrating full specification support with type safety. " +
-      "Shows OAuth 2.1, tools, prompts, resources, sampling, and notifications using Reddit as a real-world integration. " +
-      "Perfect template for building your own type-safe MCP servers.",
-    icon: "logos:reddit-icon",
-    color: "orange",
+      "MCP server for orchestrating Claude Code CLI and Gemini CLI sessions to perform coding tasks. " +
+      "Provides tools for managing coding agents, task execution, and state persistence. " +
+      "Perfect for automating complex coding workflows across multiple AI assistants.",
+    icon: "code",
+    color: "blue",
     serverStartTime: Date.now(),
     environment: process.env.NODE_ENV || "production",
     customData: {
-      serverType: "example-implementation",
+      serverType: "coding-agent-orchestrator",
       implementationFeatures: [
-        "full-mcp-spec",
-        "type-safe",
-        "oauth-2.1",
-        "sampling",
+        "task-orchestration",
+        "agent-management",
+        "state-persistence",
         "elicitation", 
         "structured-data",
         "notifications",
         "session-management"
       ],
-      exampleIntegration: "reddit-api",
-      templateUsage: "Fork this repository as a starting point for your own MCP server",
-      redditScopes: [
-        "identity",
-        "read",
-        "submit",
-        "edit",
-        "privatemessages",
-        "history",
-        "mysubreddits",
-      ],
+      supportedAgents: ["claude-code-cli", "gemini-cli"],
+      capabilities: "Orchestrates multiple AI coding assistants to complete complex tasks",
     },
   },
 };
@@ -77,7 +68,6 @@ export const serverConfig: Implementation = {
  * Each capability corresponds to a feature in the MCP specification:
  * 
  * - tools: Interactive functions the AI can call
- * - sampling: AI content generation with human approval
  * - prompts: Predefined prompt templates
  * - resources: Dynamic content the AI can read
  * - logging: Server-side logging capability
@@ -87,7 +77,6 @@ export const serverConfig: Implementation = {
 export const serverCapabilities: { capabilities: ServerCapabilities } = {
   capabilities: {
     tools: {},      // Full tool support with type-safe handlers
-    sampling: {},   // Complete sampling implementation with callbacks
     prompts: {},    // Dynamic prompt generation
     resources: {},  // Resource listing and reading
     logging: {},    // Client-requested logging support

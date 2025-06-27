@@ -2,17 +2,8 @@ import type { ServerNotification } from '@modelcontextprotocol/sdk/types.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { getMCPHandlerInstance } from '../server/mcp.js';
 
-type SamplingCompleteNotification = {
-  method: "notifications/sampling/complete";
-  params: {
-    _meta: Record<string, any>;
-    message: string;
-    level: "info" | "warning" | "error";
-    timestamp: string;
-  };
-};
 
-type RedditConfigNotification = {
+type ConfigNotification = {
   method: "server/config/changed";
   params: {
     _meta: Record<string, any>;
@@ -74,21 +65,9 @@ export async function sendJsonResultNotification(message: string): Promise<void>
   await sendNotification(notification);
 }
 
-export async function sendSamplingCompleteNotification(message: string, sessionId?: string): Promise<void> {
-  const notification: SamplingCompleteNotification = {
-    method: "notifications/sampling/complete",
-    params: {
-      _meta: {},
-      message: message,
-      level: "info",
-      timestamp: new Date().toISOString(),
-    },
-  };
-  await sendNotification(notification, sessionId);
-}
 
-export async function sendRedditConfigNotification(message: string): Promise<void> {
-  const notification: RedditConfigNotification = {
+export async function sendConfigNotification(message: string): Promise<void> {
+  const notification: ConfigNotification = {
     method: "server/config/changed",
     params: {
       _meta: {},
@@ -142,7 +121,7 @@ export async function sendResourcesListChangedNotification(sessionId?: string): 
 }
 
 async function sendNotification(
-  notification: ServerNotification | SamplingCompleteNotification | RedditConfigNotification | ProgressNotification | RootsListChangedNotification | ResourcesUpdatedNotification | ResourcesListChangedNotification,
+  notification: ServerNotification | ConfigNotification | ProgressNotification | RootsListChangedNotification | ResourcesUpdatedNotification | ResourcesListChangedNotification,
   sessionId?: string
 ) {
   const handler = getMCPHandlerInstance();
@@ -160,7 +139,9 @@ async function sendNotification(
     }
     
     try {
+      console.log(`[NOTIFICATION DEBUG] Sending ${notification.method} to session ${sessionId}`);
       await server.notification(notification as ServerNotification);
+      console.log(`[NOTIFICATION DEBUG] Successfully sent ${notification.method} to session ${sessionId}`);
     } catch (err: any) {
       console.error(`Failed to send notification to session ${sessionId}`, err);
     }
@@ -173,6 +154,8 @@ async function sendNotification(
     console.warn("No active MCP server sessions available for notification");
     return;
   }
+  
+  console.log(`[NOTIFICATION] Sending ${notification.method} to ${activeServers.length} active sessions`);
   
   const notificationPromises = activeServers.map((server: Server) => 
     server.notification(notification as ServerNotification).catch((err: any) => {

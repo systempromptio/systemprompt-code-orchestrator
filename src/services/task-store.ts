@@ -98,21 +98,21 @@ export class TaskStore extends EventEmitter {
     return Math.round(totalTime / completedTasks.length);
   }
   
-  async createTask(task: Task): Promise<void> {
+  async createTask(task: Task, sessionId?: string): Promise<void> {
     this.tasks.set(task.id, task);
     await this.persistence.saveTask(task);
     this.emit('task:created', task);
     
-    // Send MCP notifications
-    await sendResourcesListChangedNotification();
-    await sendResourcesUpdatedNotification(`task://${task.id}`);
+    // Send MCP notifications to the correct session
+    await sendResourcesListChangedNotification(sessionId);
+    await sendResourcesUpdatedNotification(`task://${task.id}`, sessionId);
   }
   
   async getTask(taskId: string): Promise<Task | null> {
     return this.tasks.get(taskId) || null;
   }
   
-  async updateTask(taskId: string, updates: Partial<Task>): Promise<Task | null> {
+  async updateTask(taskId: string, updates: Partial<Task>, sessionId?: string): Promise<Task | null> {
     const task = this.tasks.get(taskId);
     if (!task) return null;
     
@@ -126,8 +126,8 @@ export class TaskStore extends EventEmitter {
     await this.persistence.saveTask(updatedTask);
     this.emit('task:updated', updatedTask);
     
-    // Send MCP notification for resource update
-    await sendResourcesUpdatedNotification(`task://${taskId}`);
+    // Send MCP notification for resource update to the correct session
+    await sendResourcesUpdatedNotification(`task://${taskId}`, sessionId);
     
     return updatedTask;
   }
@@ -156,7 +156,7 @@ export class TaskStore extends EventEmitter {
     );
   }
   
-  async addLog(taskId: string, log: string): Promise<void> {
+  async addLog(taskId: string, log: string, sessionId?: string): Promise<void> {
     const task = this.tasks.get(taskId);
     if (task) {
       task.logs.push(`[${new Date().toISOString()}] ${log}`);
@@ -164,9 +164,9 @@ export class TaskStore extends EventEmitter {
       await this.persistence.saveTask(task);
       this.emit('task:log', { taskId, log });
       
-      // Send MCP notification for log update
-      await sendResourcesUpdatedNotification(`task://${taskId}`);
-      await sendResourcesUpdatedNotification(`task://${taskId}/logs`);
+      // Send MCP notification for log update to the correct session
+      await sendResourcesUpdatedNotification(`task://${taskId}`, sessionId);
+      await sendResourcesUpdatedNotification(`task://${taskId}/logs`, sessionId);
     }
   }
   

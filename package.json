@@ -35,6 +35,11 @@
     "status": "docker ps | grep systemprompt && ps aux | grep claude-host-proxy | grep -v grep || echo 'Services not running'",
     "docker": "docker-compose build && docker-compose up -d",
     "test": "cd e2e-test && npm test",
+    "test:typescript": "cd e2e-test/typescript && npm install && npm test",
+    "test:e2e": "cd e2e-test/typescript && npm install && npm run test:e2e",
+    "test:docker": "docker-compose up -d mcp-server && sleep 5 && cd e2e-test/typescript && MCP_BASE_URL=http://localhost:3000 npm install && MCP_BASE_URL=http://localhost:3000 npm test",
+    "test:docker:e2e": "docker-compose up -d mcp-server && sleep 5 && cd e2e-test/typescript && MCP_BASE_URL=http://localhost:3000 npm install && MCP_BASE_URL=http://localhost:3000 npm run test:e2e",
+    "test:docker:down": "docker-compose down",
     "inspector": "npx @modelcontextprotocol/inspector",
     "e2e": "cd e2e-test && npm install && npm test"
   },

@@ -8,11 +8,19 @@
  */
 
 const net = require('net');
-const { spawn, execFile } = require('child_process');
+const { spawn, execFile, exec, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.CLAUDE_PROXY_PORT || 9876;
+
+// Log environment variables at startup
+console.log('[Claude Host Proxy] Starting with environment:');
+console.log('- CLAUDE_PATH:', process.env.CLAUDE_PATH);
+console.log('- SHELL_PATH:', process.env.SHELL_PATH);
+console.log('- CLAUDE_AVAILABLE:', process.env.CLAUDE_AVAILABLE);
+console.log('- Working directory:', process.cwd());
+console.log('- Node version:', process.version);
 
 // Setup logging
 const logsDir = path.join(__dirname, '..', 'logs');
@@ -69,32 +77,97 @@ function handleConnection(socket) {
       // Execute claude - since it's a shell script, we need to use spawn with shell:true
       log(`[Claude Host Proxy] Executing: ${claudePath} ${args.join(' ')}`);
       
-      // Spawn with shell:true to handle shell scripts
-      // Use the detected shell path from environment
-      const shellPath = process.env.SHELL_PATH || '/usr/bin/sh';
-      currentProcess = spawn(claudePath, args, {
-        cwd: message.workingDirectory || process.cwd(),
-        env: process.env,
-        shell: shellPath  // Use detected shell path
-      });
+      // Execute using spawn with the detected shell path from environment
+      const shellPath = process.env.SHELL_PATH;
+      if (!shellPath) {
+        throw new Error('SHELL_PATH not set - shell not detected during startup');
+      }
+      
+      // Debug environment and paths
+      log(`[Claude Host Proxy] Environment check:`);
+      log(`[Claude Host Proxy] - CLAUDE_PATH env: ${process.env.CLAUDE_PATH}`);
+      log(`[Claude Host Proxy] - SHELL_PATH env: ${process.env.SHELL_PATH}`);
+      log(`[Claude Host Proxy] - claudePath variable: ${claudePath}`);
+      log(`[Claude Host Proxy] - shellPath variable: ${shellPath}`);
+      log(`[Claude Host Proxy] - Shell exists: ${fs.existsSync(shellPath)}`);
+      log(`[Claude Host Proxy] - Claude exists: ${fs.existsSync(claudePath)}`);
+      log(`[Claude Host Proxy] - Working dir: ${message.workingDirectory || process.cwd()}`);
+      
+      const command = `${claudePath} ${args.map(arg => `'${arg.replace(/'/g, "'\\''")}'`).join(' ')}`;
+      log(`[Claude Host Proxy] Using detected shell: ${shellPath}`);
+      log(`[Claude Host Proxy] Executing command: ${command}`);
+      
+      try {
+        // Use execFile with shell to handle the script execution
+        const options = {
+          cwd: message.workingDirectory || process.cwd(),
+          env: process.env,
+          maxBuffer: 10 * 1024 * 1024 // 10MB buffer
+          // Remove stdio option to use default ['pipe', 'pipe', 'pipe']
+        };
+        
+        log(`[Claude Host Proxy] ExecFile options:`, JSON.stringify({
+          cwd: options.cwd,
+          envKeys: Object.keys(options.env).filter(k => k.includes('CLAUDE') || k.includes('SHELL'))
+        }));
+        
+        // Use callback form to ensure proper error handling
+        currentProcess = execFile(shellPath, ['-c', command], options, (error, stdout, stderr) => {
+          if (error) {
+            log(`[Claude Host Proxy] ExecFile callback error: ${error.message}`);
+            log(`[Claude Host Proxy] Error code: ${error.code}, signal: ${error.signal}`);
+            
+            const errorResponse = {
+              type: 'error',
+              data: `Failed to execute Claude: ${error.message}`
+            };
+            
+            if (socket.writable) {
+              socket.write(JSON.stringify(errorResponse) + '\n');
+            }
+          } else {
+            log(`[Claude Host Proxy] ExecFile callback success`);
+            log(`[Claude Host Proxy] Stdout length: ${stdout.length}`);
+            log(`[Claude Host Proxy] Stderr length: ${stderr.length}`);
+          }
+        });
+        
+        log(`[Claude Host Proxy] ExecFile returned, PID: ${currentProcess.pid}`);
+      } catch (spawnError) {
+        log(`[Claude Host Proxy] ExecFile failed immediately: ${spawnError.message}`);
+        log(`[Claude Host Proxy] Error stack:`, spawnError.stack);
+        throw spawnError;
+      }
       
       log(`[Claude Host Proxy] Spawned Claude process with PID: ${currentProcess.pid}`);
       
-      // Stream stdout directly to socket
-      currentProcess.stdout.on('data', (chunk) => {
-        const data = chunk.toString();
-        log(`[Claude Host Proxy] Streaming stdout chunk (${chunk.length} bytes)`);
-        
-        // Wrap each chunk in a streaming response
-        const streamResponse = {
-          type: 'stream',
-          data: data
-        };
-        
-        if (socket.writable) {
-          socket.write(JSON.stringify(streamResponse) + '\n');
-        }
+      // Handle execFile callback for completion
+      currentProcess.on('exit', (code) => {
+        log(`[Claude Host Proxy] Claude process exited with code: ${code}`);
       });
+      
+      // Stream stdout directly to socket
+      if (currentProcess.stdout) {
+        currentProcess.stdout.on('data', (chunk) => {
+          const data = chunk.toString();
+          log(`[Claude Host Proxy] Streaming stdout chunk (${chunk.length} bytes)`);
+          log(`[Claude Host Proxy] Socket writable: ${socket.writable}`);
+          log(`[Claude Host Proxy] First 100 chars: ${data.substring(0, 100)}`);
+          
+          // Wrap each chunk in a streaming response
+          const streamResponse = {
+            type: 'stream',
+            data: data
+          };
+          
+          if (socket.writable) {
+            socket.write(JSON.stringify(streamResponse) + '\n');
+            log(`[Claude Host Proxy] Data sent to client`);
+          } else {
+            log(`[Claude Host Proxy] Socket not writable - data lost!`);
+          }
+        });
+      }
       
       // Stream stderr as error messages
       currentProcess.stderr.on('data', (chunk) => {
@@ -129,6 +202,7 @@ function handleConnection(socket) {
       
       currentProcess.on('error', (err) => {
         console.error(`[Claude Host Proxy] Process error: ${err.message}`);
+        console.error(`[Claude Host Proxy] Error details:`, err);
         
         const errorResponse = {
           type: 'error',

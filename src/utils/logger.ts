@@ -1,5 +1,5 @@
 /**
- * @file Logging utility for the Reddit MCP server
+ * @file Logging utility for the SystemPrompt Coding Agent
  * @module utils/logger
  * 
  * @remarks
@@ -16,7 +16,7 @@
  * logger.debug('Detailed debugging information', { userId: 'user123' });
  * logger.info('Server started on port', 3000);
  * logger.warn('Rate limit approaching', { remaining: 10 });
- * logger.error('Failed to connect to Reddit API', error);
+ * logger.error('Failed to connect to agent service', error);
  * ```
  */
 

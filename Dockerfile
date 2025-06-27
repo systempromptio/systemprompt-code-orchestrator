@@ -4,9 +4,6 @@ FROM node:18-alpine
 # Note: coreutils is needed for full 'env' command support (npx uses env -S)
 RUN apk add --no-cache tini git bash curl coreutils
 
-# Install global Node.js tools
-RUN npm install -g @google/gemini-cli @anthropic-ai/claude-code
-
 # Create app user and group (use node user if conflicts)
 RUN addgroup -S appgroup || true && \
     adduser -S appuser -G appgroup || true

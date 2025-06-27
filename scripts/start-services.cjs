@@ -61,11 +61,33 @@ async function startProxy() {
   
   const proxyDir = path.join(process.cwd(), 'proxy');
   
-  // Use npm run start:daemon to properly daemonize
-  execSync('npm run start:daemon', {
-    cwd: proxyDir,
-    stdio: 'inherit'
-  });
+  // Load the .env.tools file into the environment for the proxy
+  const envPath = path.join(process.cwd(), '.env.tools');
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    const envVars = {};
+    envContent.split('\n').forEach(line => {
+      if (line && !line.startsWith('#')) {
+        const [key, value] = line.split('=');
+        if (key && value) {
+          envVars[key.trim()] = value.trim();
+        }
+      }
+    });
+    
+    // Use npm run start:daemon to properly daemonize with env vars
+    execSync('npm run start:daemon', {
+      cwd: proxyDir,
+      stdio: 'inherit',
+      env: { ...process.env, ...envVars }
+    });
+  } else {
+    // Use npm run start:daemon to properly daemonize
+    execSync('npm run start:daemon', {
+      cwd: proxyDir,
+      stdio: 'inherit'
+    });
+  }
   
   // Wait a moment for proxy to start
   await new Promise(resolve => setTimeout(resolve, 1000));

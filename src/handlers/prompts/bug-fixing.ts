@@ -383,7 +383,7 @@ Debug this production-specific issue using safe, systematic approaches:
 ### 2. Diagnostic Strategy
 **Safe Logging Implementation**:
 - Add structured logging with correlation IDs
-- Use sampling to avoid log flooding
+- Use rate limiting to avoid log flooding
 - Implement log levels appropriate for production
 - Ensure no sensitive data in logs
 - Use centralized logging services

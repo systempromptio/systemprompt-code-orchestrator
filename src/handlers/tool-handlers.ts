@@ -115,7 +115,7 @@ export async function handleListTools(_request: ListToolsRequest): Promise<ListT
  */
 export async function handleToolCall(
   request: CallToolRequest,
-  _context: MCPToolContext,
+  context: MCPToolContext,
 ): Promise<CallToolResult> {
   
   try {
@@ -160,29 +160,31 @@ export async function handleToolCall(
 
     let result: CallToolResult;
 
-    // Route to appropriate handler
+    // Route to appropriate handler with context
+    logger.info(`[HANDLER] Processing ${request.params.name} for session: ${context.sessionId}`);
+    
     switch (request.params.name) {
       case "create_task":
         logger.info('Raw args for create_task:', JSON.stringify(args, null, 2));
-        result = await handleCreateTask(args);
+        result = await handleCreateTask(args, context);
         break;
       case "update_task":
-        result = await handleUpdateTask(args);
+        result = await handleUpdateTask(args, context);
         break;
       case "end_task":
-        result = await handleEndTask(args);
+        result = await handleEndTask(args, context);
         break;
       case "report_task":
-        result = await handleReportTask(args);
+        result = await handleReportTask(args, context);
         break;
       case "update_stats":
-        result = await handleUpdateStats(args);
+        result = await handleUpdateStats(args, context);
         break;
       case "check_status":
-        result = await handleCheckStatus(args);
+        result = await handleCheckStatus(args, context);
         break;
       case "clean_state":
-        result = await handleCleanState(args);
+        result = await handleCleanState(args, context);
         break;
       default:
         logger.error("Unsupported tool in switch statement", { toolName: request.params.name });

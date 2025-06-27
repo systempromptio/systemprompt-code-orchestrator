@@ -69,7 +69,7 @@ export class TestTracker {
 /**
  * Create and connect MCP client
  */
-export async function createMCPClient(): Promise<Client> {
+export async function createMCPClient(enableNotifications = false): Promise<Client> {
   log.debug(`Connecting to MCP server at ${MCP_BASE_URL}`);
   
   const transport = new StreamableHTTPClientTransport(
@@ -92,7 +92,10 @@ export async function createMCPClient(): Promise<Client> {
     {
       capabilities: {
         prompts: {},
-        resources: {},
+        resources: {
+          subscribe: enableNotifications,
+          listChanged: enableNotifications
+        },
         tools: {},
         // sampling: {} // Removed sampling
       }

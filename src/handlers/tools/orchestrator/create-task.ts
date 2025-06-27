@@ -17,7 +17,7 @@ const CreateTaskSchema = z.object({
 
 type CreateTaskArgs = z.infer<typeof CreateTaskSchema>;
 
-export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
+export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args, context) => {
   try {
     const validated = CreateTaskSchema.parse(args);
     const taskStore = TaskStore.getInstance();
@@ -26,6 +26,10 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
     // Use the project path from environment or default root
     const resolvedProjectPath = process.env.PROJECT_ROOT || process.env.PROJECTS_PATH || '/var/www/html/systemprompt-coding-agent';
     logger.info(`Using project path: ${resolvedProjectPath}`);
+    
+    // Extract session ID from context
+    const sessionId = context?.sessionId;
+    logger.info(`[CREATE_TASK] Session ID: ${sessionId || 'none'}`);
     
     // Generate unique task ID
     const taskId = `task_${uuidv4()}`;
@@ -50,15 +54,15 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
       logs: [`Task created with ${validated.tool} tool`]
     };
     
-    // Store task
-    await taskStore.createTask(task);
+    // Store task with session ID for proper notification routing
+    await taskStore.createTask(task, sessionId);
     
-    let sessionId: string | null = null;
+    let agentSessionId: string | null = null;
     let commandResult: any = null;
     
     // Always start AI session immediately
     try {
-        await taskStore.updateTask(taskId, { status: "in_progress" });
+        await taskStore.updateTask(taskId, { status: "in_progress" }, sessionId);
         
         // Create the branch in the file system (if Git is available)
         try {
@@ -78,21 +82,21 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
                 cwd: projectPath,
                 stdio: 'ignore'
               });
-              await taskStore.addLog(taskId, `Created and switched to branch: ${validated.branch}`);
+              await taskStore.addLog(taskId, `Created and switched to branch: ${validated.branch}`, sessionId);
             } catch (e) {
               // Branch might already exist, try to checkout
               execSync(`git checkout ${validated.branch}`, {
                 cwd: projectPath,
                 stdio: 'ignore'
               });
-              await taskStore.addLog(taskId, `Switched to existing branch: ${validated.branch}`);
+              await taskStore.addLog(taskId, `Switched to existing branch: ${validated.branch}`, sessionId);
             }
           } catch (e) {
-            await taskStore.addLog(taskId, `Not a git repository, proceeding without branch: ${validated.branch}`);
+            await taskStore.addLog(taskId, `Not a git repository, proceeding without branch: ${validated.branch}`, sessionId);
           }
         } catch (e) {
           logger.warn(`Failed to create branch: ${e}`);
-          await taskStore.addLog(taskId, `Failed to create branch: ${e}`);
+          await taskStore.addLog(taskId, `Failed to create branch: ${e}`, sessionId);
         }
         
         if (validated.tool === "CLAUDECODE") {
@@ -101,7 +105,7 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
             workingDirectory: resolvedProjectPath
           };
           
-          sessionId = await agentManager.startClaudeSession({
+          agentSessionId = await agentManager.startClaudeSession({
             project_path: resolvedProjectPath,
             task_id: taskId,
             options: claudeOptions
@@ -109,20 +113,20 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
           
           // Link the Claude session to the task for proper logging
           const claudeService = ClaudeCodeService.getInstance();
-          const agentSession = agentManager.getSession(sessionId);
+          const agentSession = agentManager.getSession(agentSessionId);
           if (agentSession?.serviceSessionId) {
             claudeService.setTaskId(agentSession.serviceSessionId, taskId);
-            await taskStore.addLog(taskId, `[SESSION_LINKED] Claude session ${agentSession.serviceSessionId} linked to task`);
+            await taskStore.addLog(taskId, `[SESSION_LINKED] Claude session ${agentSession.serviceSessionId} linked to task`, sessionId);
           }
           
           // Set up event listeners for task tracking
           const progressHandler = async (data: any) => {
             if (data.taskId === taskId) {
-              await taskStore.addLog(taskId, `[PROGRESS] ${data.event}: ${data.data}`);
+              await taskStore.addLog(taskId, `[PROGRESS] ${data.event}: ${data.data}`, sessionId);
               
               // Update task status based on events
               if (data.event === 'error:occurred') {
-                await taskStore.updateTask(taskId, { status: 'failed' });
+                await taskStore.updateTask(taskId, { status: 'failed' }, sessionId);
               }
             }
           };
@@ -131,7 +135,7 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
             if (data.taskId === taskId) {
               // Stream data is already comprehensively logged in parseProgressFromStream
               // Just track activity for monitoring
-              const agentSession = agentManager.getSession(sessionId);
+              const agentSession = agentSessionId ? agentManager.getSession(agentSessionId) : null;
               if (agentSession) {
                 agentSession.last_activity = new Date().toISOString();
               }
@@ -144,17 +148,17 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
           // Send initial instructions directly (branch already created)
           try {
             if (validated.instructions) {
-              await taskStore.addLog(taskId, `[INSTRUCTIONS_SENDING] Sending initial instructions...`);
+              await taskStore.addLog(taskId, `[INSTRUCTIONS_SENDING] Sending initial instructions...`, sessionId);
               
               // The sendCommand promise resolves when Claude completes the task
-              const result = await agentManager.sendCommand(sessionId, {
+              const result = await agentManager.sendCommand(agentSessionId!, {
                 command: validated.instructions
               });
               
               commandResult = result;
-              await taskStore.addLog(taskId, `[INSTRUCTIONS_COMPLETED] Claude has finished processing the instructions`);
+              await taskStore.addLog(taskId, `[INSTRUCTIONS_COMPLETED] Claude has finished processing the instructions`, sessionId);
               await taskStore.updateTask(taskId, { status: 'completed' });
-              await taskStore.addLog(taskId, `[TASK_COMPLETED] Task completed successfully`);
+              await taskStore.addLog(taskId, `[TASK_COMPLETED] Task completed successfully`, sessionId);
               
               // Clean up event listeners
               claudeService.off('task:progress', progressHandler);
@@ -162,7 +166,7 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
             }
           } catch (cmdError) {
             logger.error('Failed to send instructions to Claude Code', cmdError);
-            await taskStore.addLog(taskId, `[ERROR] Instructions error: ${cmdError}`);
+            await taskStore.addLog(taskId, `[ERROR] Instructions error: ${cmdError}`, sessionId);
             await taskStore.updateTask(taskId, { status: 'failed' });
             
             // Clean up event listeners
@@ -174,7 +178,7 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
           // Start Gemini session
           const geminiOptions: GeminiOptions = {};
           
-          sessionId = await agentManager.startGeminiSession({
+          agentSessionId = await agentManager.startGeminiSession({
             project_path: resolvedProjectPath,
             task_id: taskId,
             options: geminiOptions
@@ -182,7 +186,7 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
           
           // Send initial instructions
           if (validated.instructions) {
-            const result = await agentManager.sendCommand(sessionId, {
+            const result = await agentManager.sendCommand(agentSessionId, {
               command: validated.instructions
             });
             commandResult = result;
@@ -190,27 +194,27 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
         }
         
         // Update task with session assignment
-        if (sessionId) {
-          task.assigned_to = sessionId;
+        if (agentSessionId) {
+          task.assigned_to = agentSessionId;
           await taskStore.updateTask(taskId, { 
-            assigned_to: sessionId,
-            logs: [`Session ${sessionId} started with ${validated.tool}`]
-          });
+            assigned_to: agentSessionId,
+            logs: [`Session ${agentSessionId} started with ${validated.tool}`]
+          }, sessionId);
         }
         
     } catch (error) {
-      await taskStore.addLog(taskId, `Failed to start session: ${error}`);
-      await taskStore.updateTask(taskId, { status: "failed" });
+      await taskStore.addLog(taskId, `Failed to start session: ${error}`, sessionId);
+      await taskStore.updateTask(taskId, { status: "failed" }, sessionId);
     }
     
     return formatToolResponse({
-      message: `Task created successfully${sessionId ? ' and started' : ''}`,
+      message: `Task created successfully${agentSessionId ? ' and started' : ''}`,
       result: {
         task_id: taskId,
         title: task.title,
         status: task.status,
         tool: validated.tool,
-        session_id: sessionId,
+        session_id: agentSessionId,
         initial_command_result: commandResult,
         created_at: task.created_at
       }
