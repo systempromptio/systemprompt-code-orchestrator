@@ -10,21 +10,12 @@ import { logger } from "../../../utils/logger.js";
 
 const CreateTaskSchema = z.object({
   title: z.string(),
-  description: z.string(),
-  model: z.enum(["claude", "gemini"]),
-  command: z.string(),
+  tool: z.enum(["CLAUDECODE", "GEMINICLI"]),
+  instructions: z.string(),
   project_path: z.string(),
   branch: z.string(),
-  requirements: z.array(z.string()).optional(),
   priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
-  start_immediately: z.boolean().default(true),
-  context: z.object({
-    files: z.array(z.string()).optional(),
-    system_prompt: z.string().optional(),
-    max_turns: z.number().optional(),
-    temperature: z.number().optional()
-  }).optional(),
-  dependencies: z.array(z.string()).optional()
+  start_immediately: z.boolean().default(true)
 });
 
 type CreateTaskArgs = z.infer<typeof CreateTaskSchema>;
@@ -46,20 +37,20 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
     const task = {
       id: taskId,
       title: validated.title,
-      description: validated.description,
-      requirements: validated.requirements || [],
+      description: validated.instructions,
+      requirements: [],
       priority: validated.priority,
       estimated_complexity: "moderate" as const,
-      preferred_agent: validated.model as "claude" | "gemini",
+      preferred_agent: (validated.tool === "CLAUDECODE" ? "claude" : "gemini") as "claude" | "gemini",
       project_path: resolvedProjectPath,
       branch: validated.branch,
-      dependencies: validated.dependencies || [],
+      dependencies: [],
       status: "pending" as const,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       assigned_to: null as string | null,
       progress: 0,
-      logs: [`Task created with ${validated.model} model`]
+      logs: [`Task created with ${validated.tool} tool`]
     };
     
     // Store task
@@ -108,40 +99,35 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
           await taskStore.addLog(taskId, `Failed to create branch: ${e}`);
         }
         
-        if (validated.model === "claude") {
+        if (validated.tool === "CLAUDECODE") {
           // Start Claude session with user's project directory
           const claudeOptions: ClaudeCodeOptions = {
-            customSystemPrompt: validated.context?.system_prompt,
-            maxTurns: validated.context?.max_turns,
             workingDirectory: validated.project_path
           };
           
           sessionId = await agentManager.startClaudeSession({
             project_path: validated.project_path, // Use the user's provided project path
             task_id: taskId,
-            options: claudeOptions,
-            initial_context: validated.context?.system_prompt
+            options: claudeOptions
           });
           
-          // Send initial user command directly (branch already created)
+          // Send initial instructions directly (branch already created)
           try {
-            if (validated.command) {
+            if (validated.instructions) {
               const result = await agentManager.sendCommand(sessionId, {
-                command: validated.command
+                command: validated.instructions
               });
               commandResult = result;
-              await taskStore.addLog(taskId, `Sent initial command to Claude Code`);
+              await taskStore.addLog(taskId, `Sent initial instructions to Claude Code`);
             }
           } catch (cmdError) {
-            logger.error('Failed to send command to Claude Code', cmdError);
-            await taskStore.addLog(taskId, `Command error: ${cmdError}`);
+            logger.error('Failed to send instructions to Claude Code', cmdError);
+            await taskStore.addLog(taskId, `Instructions error: ${cmdError}`);
           }
           
-        } else if (validated.model === "gemini") {
+        } else if (validated.tool === "GEMINICLI") {
           // Start Gemini session
-          const geminiOptions: GeminiOptions = {
-            temperature: validated.context?.temperature
-          };
+          const geminiOptions: GeminiOptions = {};
           
           sessionId = await agentManager.startGeminiSession({
             project_path: resolvedProjectPath,
@@ -149,20 +135,10 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
             options: geminiOptions
           });
           
-          // Add files to context if provided
-          if (validated.context?.files && validated.context.files.length > 0) {
-            const contextCommand = validated.context.files
-              .map(file => `@${file}`)
-              .join(' ');
-            await agentManager.sendCommand(sessionId, {
-              command: contextCommand
-            });
-          }
-          
-          // Send initial command
-          if (validated.command) {
+          // Send initial instructions
+          if (validated.instructions) {
             const result = await agentManager.sendCommand(sessionId, {
-              command: validated.command
+              command: validated.instructions
             });
             commandResult = result;
           }
@@ -173,7 +149,7 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
           task.assigned_to = sessionId;
           await taskStore.updateTask(taskId, { 
             assigned_to: sessionId,
-            logs: [`Session ${sessionId} started with ${validated.model}`]
+            logs: [`Session ${sessionId} started with ${validated.tool}`]
           });
         }
         
@@ -189,7 +165,7 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
         task_id: taskId,
         title: task.title,
         status: task.status,
-        model: validated.model,
+        tool: validated.tool,
         session_id: sessionId,
         initial_command_result: commandResult,
         created_at: task.created_at

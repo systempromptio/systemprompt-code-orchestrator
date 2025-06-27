@@ -29,21 +29,12 @@ import { handleCleanState } from './tools/orchestrator/clean-state.js';
 const ToolSchemas = {
   create_task: z.object({
     title: z.string(),
-    description: z.string(),
-    model: z.enum(["claude", "gemini"]),
-    command: z.string(),
+    tool: z.enum(["CLAUDECODE", "GEMINICLI"]),
+    instructions: z.string(),
     project_path: z.string(),
     branch: z.string(),
-    requirements: z.array(z.string()).optional(),
     priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
-    start_immediately: z.boolean().default(true),
-    context: z.object({
-      files: z.array(z.string()).optional(),
-      system_prompt: z.string().optional(),
-      max_turns: z.number().optional(),
-      temperature: z.number().optional()
-    }).optional(),
-    dependencies: z.array(z.string()).optional()
+    start_immediately: z.boolean().default(true)
   }),
   
   update_task: z.object({

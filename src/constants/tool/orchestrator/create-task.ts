@@ -14,14 +14,14 @@ export const createTask: Tool = {
         type: "string",
         description: "Detailed description of what needs to be done"
       },
-      model: {
+      tool: {
         type: "string",
-        enum: ["claude", "gemini"],
-        description: "Which AI model to use for this task"
+        enum: ["CLAUDECODE", "GEMINICLI"],
+        description: "Which AI tool to use for this task"
       },
-      command: {
+      instructions: {
         type: "string",
-        description: "Initial command to send to the AI model when starting the task"
+        description: "Detailed instructions of what needs to be done"
       },
       project_path: {
         type: "string",
@@ -30,13 +30,6 @@ export const createTask: Tool = {
       branch: {
         type: "string",
         description: "Git branch name to use for this task (will be created if it doesn't exist)"
-      },
-      requirements: {
-        type: "array",
-        items: {
-          type: "string"
-        },
-        description: "List of specific requirements or acceptance criteria"
       },
       priority: {
         type: "string",
@@ -49,39 +42,7 @@ export const createTask: Tool = {
         default: true,
         description: "Whether to start the task immediately after creation"
       },
-      context: {
-        type: "object",
-        properties: {
-          files: {
-            type: "array",
-            items: {
-              type: "string"
-            },
-            description: "Files to add to context (for Gemini @ notation or Claude context)"
-          },
-          system_prompt: {
-            type: "string",
-            description: "System prompt for Claude or initial context for Gemini"
-          },
-          max_turns: {
-            type: "number",
-            description: "Maximum conversation turns (Claude specific)"
-          },
-          temperature: {
-            type: "number",
-            description: "Model temperature setting"
-          }
-        },
-        description: "Additional context and configuration for the AI model"
-      },
-      dependencies: {
-        type: "array",
-        items: {
-          type: "string"
-        },
-        description: "Task IDs that must be completed before this task"
-      }
     },
-    required: ["title", "description", "model", "command", "project_path", "branch"]
+    required: ["title", "tool", "instructions", "project_path", "branch"]
   }
 };
