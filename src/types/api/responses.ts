@@ -68,10 +68,10 @@ export interface BatchSummary {
 }
 
 export interface ValidationErrorResponse extends ApiResponse<never> {
-  readonly error: ValidationError;
+  readonly error: ValidationApiError;
 }
 
-export interface ValidationError extends ApiError {
+export interface ValidationApiError extends ApiError {
   readonly code: 'VALIDATION_ERROR';
   readonly validationErrors: FieldError[];
 }

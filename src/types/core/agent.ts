@@ -33,7 +33,7 @@ export interface AgentInitOptions<TConfig = unknown> {
 }
 
 export interface QueryContext {
-  readonly sessionId: SessionId;
+  readonly sessionId: string;
   readonly parentTaskId?: string;
   readonly toolsEnabled?: boolean;
   readonly streamResponse?: boolean;
@@ -108,7 +108,7 @@ export const QueryContextSchema = z.object({
   metadata: z.record(z.unknown()).optional()
 });
 
-export type AgentEventMap = {
+export type AgentInstanceEventMap = {
   'status:changed': (status: AgentStatus) => void;
   'query:start': (context: QueryContext) => void;
   'query:complete': (result: QueryResult) => void;

@@ -93,11 +93,16 @@ export class AgentManager extends EventEmitter {
     
     const serviceSessionId = await this.claudeService.createSession(claudeOptions);
     
+    // Link the Claude session with the task
+    if (config.task_id) {
+      this.claudeService.setTaskId(serviceSessionId, config.task_id);
+    }
+    
     const session: AgentSession = {
       id: sessionId,
       type: 'claude',
       serviceSessionId,
-      status: 'starting',
+      status: 'active', // Claude Code SDK sessions are ready immediately
       projectPath: config.project_path,
       taskId: config.task_id,
       created_at: new Date().toISOString(),
@@ -108,6 +113,14 @@ export class AgentManager extends EventEmitter {
     
     this.sessions.set(sessionId, session);
     this.emit('session:created', { sessionId, type: 'claude' });
+    
+    // Listen for task progress events
+    this.claudeService.on('task:progress', (progress) => {
+      if (progress.taskId === config.task_id) {
+        this.emit('task:progress', progress);
+        session.last_activity = new Date().toISOString();
+      }
+    });
     
     return sessionId;
   }
@@ -134,7 +147,7 @@ export class AgentManager extends EventEmitter {
       id: sessionId,
       type: 'gemini',
       serviceSessionId,
-      status: 'starting',
+      status: 'active', // Gemini sessions are ready immediately
       projectPath: config.project_path,
       taskId: config.task_id,
       created_at: new Date().toISOString(),

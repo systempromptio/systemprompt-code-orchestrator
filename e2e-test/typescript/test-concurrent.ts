@@ -23,6 +23,7 @@ async function testConcurrentTools(client: Client): Promise<void> {
         model: i % 2 === 0 ? 'claude' : 'gemini',
         command: `echo "Task ${i + 1} running"`,
         project_path: `/tmp/concurrent-test-${i + 1}`,
+        branch: `test-concurrent-${i + 1}`,
         priority: 'low',
         start_immediately: false
       }
@@ -95,6 +96,7 @@ async function testMixedConcurrent(client: Client): Promise<void> {
         model: 'claude',
         command: 'echo "Mixed test"',
         project_path: '/tmp/mixed-test',
+        branch: 'test-mixed-concurrent',
         priority: 'medium',
         start_immediately: false
       }

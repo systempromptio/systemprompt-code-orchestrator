@@ -22,6 +22,10 @@ export PORT=${PORT:-3000}
 export STATE_PATH=${STATE_PATH:-/data/state}
 export PROJECTS_PATH=${PROJECTS_PATH:-/data/projects}
 
+# Unset ANTHROPIC_API_KEY to use authenticated session
+unset ANTHROPIC_API_KEY
+echo "- Using Claude authenticated session (ANTHROPIC_API_KEY unset)"
+
 echo "Starting Coding Agent MCP Server..."
 echo "- Environment: $NODE_ENV"
 echo "- Port: $PORT"
