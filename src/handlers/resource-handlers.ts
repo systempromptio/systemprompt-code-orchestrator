@@ -8,6 +8,7 @@ import { RESOURCES } from '../constants/resources.js';
 import { TaskStore } from '../services/task-store.js';
 import { logger } from '../utils/logger.js';
 import { matchResourceTemplate } from './resource-templates-handler.js';
+import { getTaskOutputResource, listTaskOutputResources } from './resources/task-output.js';
 
 export async function handleListResources(): Promise<ListResourcesResult> {
   try {
@@ -26,7 +27,11 @@ export async function handleListResources(): Promise<ListResourcesResult> {
       });
     });
     
-    logger.debug(`📚 Listing ${resources.length} resources (${RESOURCES.length} static, ${tasks.length} tasks)`);
+    // Add task output resources
+    const taskOutputResources = await listTaskOutputResources();
+    resources.push(...taskOutputResources);
+    
+    logger.debug(`📚 Listing ${resources.length} resources (${RESOURCES.length} static, ${tasks.length} tasks, ${taskOutputResources.length} outputs)`);
     
     return { resources };
   } catch (error) {
@@ -88,6 +93,19 @@ export async function handleResourceCall(
       };
     }
 
+    // Handle task output resources
+    if (uri.startsWith("task-output://")) {
+      const url = new URL(uri);
+      const resource = await getTaskOutputResource(url);
+      return {
+        contents: [{
+          uri: resource.uri,
+          mimeType: resource.mimeType || "application/json",
+          text: String(resource.text || "{}")
+        }]
+      };
+    }
+    
     // Handle individual task resources
     if (uri.startsWith("task://")) {
       const taskId = uri.replace("task://", "");

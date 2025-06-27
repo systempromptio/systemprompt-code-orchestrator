@@ -55,6 +55,7 @@ async function testCreateTask(client: Client): Promise<string> {
       model: 'claude',
       command: 'echo "Hello from test task"',
       project_path: '/tmp/test-project',
+      branch: 'test-branch',
       priority: 'medium',
       start_immediately: false
     }

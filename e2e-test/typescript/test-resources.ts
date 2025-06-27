@@ -127,6 +127,7 @@ async function testTaskResource(client: Client): Promise<void> {
       model: 'claude',
       command: 'echo "Testing resources"',
       project_path: '/tmp/resource-test',
+      branch: 'test-resources',
       priority: 'low',
       start_immediately: false
     }

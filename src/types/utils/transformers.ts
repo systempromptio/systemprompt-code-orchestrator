@@ -44,20 +44,20 @@ export type Entries<T> = {
   [K in keyof T]: [K, T[K]];
 }[keyof T][];
 
-export type FromEntries<T extends readonly (readonly [PropertyKey, any])[]> = {
-  [K in T[number][0]]: Extract<T[number], readonly [K, any]>[1];
+export type FromEntries<T extends readonly (readonly [PropertyKey, unknown])[]> = {
+  [K in T[number][0]]: Extract<T[number], readonly [K, unknown]>[1];
 };
 
 export type Awaited<T> = T extends PromiseLike<infer U> ? U : T;
 
 export type PromiseValue<T> = T extends Promise<infer U> ? U : never;
 
-export type AsyncReturnType<T extends (...args: any[]) => Promise<any>> = 
-  T extends (...args: any[]) => Promise<infer R> ? R : never;
+export type AsyncReturnType<T extends (...args: unknown[]) => Promise<unknown>> = 
+  T extends (...args: unknown[]) => Promise<infer R> ? R : never;
 
-export type Constructor<T = {}> = new (...args: any[]) => T;
+export type Constructor<T = {}> = new (...args: unknown[]) => T;
 
-export type AbstractConstructor<T = {}> = abstract new (...args: any[]) => T;
+export type AbstractConstructor<T = {}> = abstract new (...args: unknown[]) => T;
 
 export type Branded<T, Brand extends string> = T & { readonly __brand: Brand };
 
@@ -65,61 +65,61 @@ export function createBranded<T, Brand extends string>(value: T): Branded<T, Bra
   return value as Branded<T, Brand>;
 }
 
-export function removeUndefined<T extends Record<string, any>>(obj: T): {
+export function removeUndefined<T extends Record<string, unknown>>(obj: T): {
   [K in keyof T]-?: Exclude<T[K], undefined>;
 } {
-  const result: any = {};
+  const result = {} as { [K in keyof T]-?: Exclude<T[K], undefined> };
   for (const key in obj) {
     if (obj[key] !== undefined) {
-      result[key] = obj[key];
+      result[key] = obj[key] as Exclude<T[typeof key], undefined>;
     }
   }
   return result;
 }
 
-export function removeNull<T extends Record<string, any>>(obj: T): {
+export function removeNull<T extends Record<string, unknown>>(obj: T): {
   [K in keyof T]-?: Exclude<T[K], null>;
 } {
-  const result: any = {};
+  const result = {} as { [K in keyof T]-?: Exclude<T[K], null> };
   for (const key in obj) {
     if (obj[key] !== null) {
-      result[key] = obj[key];
+      result[key] = obj[key] as Exclude<T[typeof key], null>;
     }
   }
   return result;
 }
 
-export function removeNullish<T extends Record<string, any>>(obj: T): {
+export function removeNullish<T extends Record<string, unknown>>(obj: T): {
   [K in keyof T]-?: NonNullable<T[K]>;
 } {
-  const result: any = {};
+  const result = {} as { [K in keyof T]-?: NonNullable<T[K]> };
   for (const key in obj) {
     if (obj[key] != null) {
-      result[key] = obj[key];
+      result[key] = obj[key] as NonNullable<T[typeof key]>;
     }
   }
   return result;
 }
 
-export function entries<T extends Record<string, any>>(obj: T): Entries<T> {
+export function entries<T extends Record<string, unknown>>(obj: T): Entries<T> {
   return Object.entries(obj) as Entries<T>;
 }
 
-export function fromEntries<T extends readonly (readonly [PropertyKey, any])[]>(
+export function fromEntries<T extends readonly (readonly [PropertyKey, unknown])[]>(
   entries: T
 ): FromEntries<T> {
   return Object.fromEntries(entries) as FromEntries<T>;
 }
 
-export function keys<T extends Record<string, any>>(obj: T): (keyof T)[] {
+export function keys<T extends Record<string, unknown>>(obj: T): (keyof T)[] {
   return Object.keys(obj) as (keyof T)[];
 }
 
-export function values<T extends Record<string, any>>(obj: T): ValueOf<T>[] {
+export function values<T extends Record<string, unknown>>(obj: T): ValueOf<T>[] {
   return Object.values(obj) as ValueOf<T>[];
 }
 
-export function mapObject<T extends Record<string, any>, U>(
+export function mapObject<T extends Record<string, unknown>, U>(
   obj: T,
   fn: (value: T[keyof T], key: keyof T) => U
 ): Record<keyof T, U> {
@@ -130,7 +130,7 @@ export function mapObject<T extends Record<string, any>, U>(
   return result;
 }
 
-export function filterObject<T extends Record<string, any>>(
+export function filterObject<T extends Record<string, unknown>>(
   obj: T,
   predicate: (value: T[keyof T], key: keyof T) => boolean
 ): Partial<T> {
@@ -143,7 +143,7 @@ export function filterObject<T extends Record<string, any>>(
   return result;
 }
 
-export function pick<T extends Record<string, any>, K extends keyof T>(
+export function pick<T extends Record<string, unknown>, K extends keyof T>(
   obj: T,
   keys: K[]
 ): Pick<T, K> {
@@ -156,7 +156,7 @@ export function pick<T extends Record<string, any>, K extends keyof T>(
   return result;
 }
 
-export function omit<T extends Record<string, any>, K extends keyof T>(
+export function omit<T extends Record<string, unknown>, K extends keyof T>(
   obj: T,
   keys: K[]
 ): Omit<T, K> {

@@ -6,9 +6,7 @@ import { TaskStore } from "../../../services/task-store.js";
 import { AgentManager } from "../../../services/agent-manager.js";
 import { ClaudeCodeOptions } from "../../../services/claude-code-service.js";
 import { GeminiOptions } from "../../../services/gemini-cli-service.js";
-import { execSync } from 'child_process';
 import { logger } from "../../../utils/logger.js";
-import * as path from 'path';
 
 const CreateTaskSchema = z.object({
   title: z.string(),
@@ -75,9 +73,40 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
       try {
         await taskStore.updateTask(taskId, { status: "in_progress" });
         
-        // Store the branch information - Claude Code will handle the actual Git operations
-        await taskStore.addLog(taskId, `Task will use branch: ${validated.branch}`);
-        logger.info(`Task created for branch: ${validated.branch}, Claude Code will handle Git operations`);
+        // Create the branch in the file system (if Git is available)
+        try {
+          const { execSync } = await import('child_process');
+          const projectPath = validated.project_path;
+          
+          // Check if it's a git repository
+          try {
+            execSync('git rev-parse --git-dir', { 
+              cwd: projectPath, 
+              stdio: 'ignore' 
+            });
+            
+            // Create and checkout the branch
+            try {
+              execSync(`git checkout -b ${validated.branch}`, {
+                cwd: projectPath,
+                stdio: 'ignore'
+              });
+              await taskStore.addLog(taskId, `Created and switched to branch: ${validated.branch}`);
+            } catch (e) {
+              // Branch might already exist, try to checkout
+              execSync(`git checkout ${validated.branch}`, {
+                cwd: projectPath,
+                stdio: 'ignore'
+              });
+              await taskStore.addLog(taskId, `Switched to existing branch: ${validated.branch}`);
+            }
+          } catch (e) {
+            await taskStore.addLog(taskId, `Not a git repository, proceeding without branch: ${validated.branch}`);
+          }
+        } catch (e) {
+          logger.warn(`Failed to create branch: ${e}`);
+          await taskStore.addLog(taskId, `Failed to create branch: ${e}`);
+        }
         
         if (validated.model === "claude") {
           // Start Claude session with user's project directory
@@ -94,23 +123,17 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args) => {
             initial_context: validated.context?.system_prompt
           });
           
-          // First, send command to checkout the branch, then the user's command
+          // Send initial user command directly (branch already created)
           try {
-            // Send Git checkout command to Claude Code
-            await agentManager.sendCommand(sessionId, {
-              command: `git checkout -b ${validated.branch} || git checkout ${validated.branch}`
-            });
-            await taskStore.addLog(taskId, `Sent branch checkout command to Claude Code`);
-            
-            // Send initial user command
             if (validated.command) {
               const result = await agentManager.sendCommand(sessionId, {
                 command: validated.command
               });
               commandResult = result;
+              await taskStore.addLog(taskId, `Sent initial command to Claude Code`);
             }
           } catch (cmdError) {
-            logger.error('Failed to send commands to Claude Code', cmdError);
+            logger.error('Failed to send command to Claude Code', cmdError);
             await taskStore.addLog(taskId, `Command error: ${cmdError}`);
           }
           

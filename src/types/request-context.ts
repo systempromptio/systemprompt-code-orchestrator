@@ -26,6 +26,14 @@
  * }
  * ```
  */
+export interface AuthInfo {
+  readonly userId?: string;
+  readonly token?: string;
+  readonly roles?: string[];
+  readonly permissions?: string[];
+  readonly metadata?: Record<string, unknown>;
+}
+
 export interface MCPToolContext {
   /**
    * Unique session identifier for the current MCP connection.
@@ -36,6 +44,6 @@ export interface MCPToolContext {
   /**
    * Optional authentication information for future use.
    */
-  authInfo?: any;
+  authInfo?: AuthInfo;
 }
 

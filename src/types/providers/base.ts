@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IAgent, AgentInitOptions, QueryContext, QueryResult } from '../core/agent';
+import { IAgent, AgentInitOptions } from '../core/agent';
 
 export interface IAgentProvider<TConfig = unknown, TResponse = unknown> {
   readonly name: string;
@@ -33,7 +33,7 @@ export interface ProviderMessage {
   readonly toolCalls?: ProviderToolCall[];
 }
 
-export interface StreamingResponse {
+export interface ProviderStreamingResponse {
   readonly delta: string;
   readonly finished: boolean;
   readonly toolCall?: Partial<ProviderToolCall>;

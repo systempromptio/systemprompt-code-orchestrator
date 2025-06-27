@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SessionId } from './agent';
+import { SessionId } from './session';
 import { TaskId } from './task';
 
 export interface ExecutionContext {
@@ -90,7 +90,7 @@ export interface RequestContext {
   readonly timestamp: Date;
   readonly source: 'api' | 'cli' | 'web' | 'internal';
   readonly user?: UserContext;
-  readonly session?: SessionContext;
+  readonly session?: UserSessionContext;
   readonly metadata?: Record<string, unknown>;
 }
 
@@ -101,7 +101,7 @@ export interface UserContext {
   readonly permissions?: string[];
 }
 
-export interface SessionContext {
+export interface UserSessionContext {
   readonly id: string;
   readonly createdAt: Date;
   readonly expiresAt?: Date;

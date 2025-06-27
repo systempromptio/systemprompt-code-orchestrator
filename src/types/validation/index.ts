@@ -20,7 +20,7 @@ import {
  * Central validation registry
  */
 export class ValidationRegistry {
-  private static schemas = new Map<string, z.ZodSchema<any>>();
+  private static schemas = new Map<string, z.ZodSchema<unknown>>();
   
   static {
     // Register all schemas
@@ -50,7 +50,7 @@ export class ValidationRegistry {
   /**
    * Get a schema by name
    */
-  static get<T>(name: string): z.ZodSchema<T> | undefined {
+  static get(name: string): z.ZodSchema<unknown> | undefined {
     return this.schemas.get(name);
   }
   
@@ -58,18 +58,18 @@ export class ValidationRegistry {
    * Validate data against a schema
    */
   static validate<T>(name: string, data: unknown): T {
-    const schema = this.get<T>(name);
+    const schema = this.get(name);
     if (!schema) {
       throw new Error(`Schema '${name}' not found`);
     }
-    return schema.parse(data);
+    return schema.parse(data) as T;
   }
   
   /**
    * Safe validate (returns result instead of throwing)
    */
   static safeValidate<T>(name: string, data: unknown): z.SafeParseReturnType<unknown, T> {
-    const schema = this.get<T>(name);
+    const schema = this.get(name);
     if (!schema) {
       return {
         success: false,
@@ -78,9 +78,9 @@ export class ValidationRegistry {
           message: `Schema '${name}' not found`,
           path: []
         }])
-      };
+      } as z.SafeParseReturnType<unknown, T>;
     }
-    return schema.safeParse(data);
+    return schema.safeParse(data) as z.SafeParseReturnType<unknown, T>;
   }
   
   /**
@@ -91,15 +91,30 @@ export class ValidationRegistry {
   }
 }
 
+// For middleware, we'll use a generic interface instead of Express types
+// to avoid coupling to a specific framework
+interface Request {
+  body?: unknown;
+  query?: unknown;
+  params?: unknown;
+}
+
+interface Response {
+  status(code: number): Response;
+  json(data: unknown): void;
+}
+
+type NextFunction = () => void;
+
 /**
- * Validation middleware for Express
+ * Validation middleware for body
  */
 export function validateBody(schemaName: string) {
-  return (req: any, res: any, next: any) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     const result = ValidationRegistry.safeValidate(schemaName, req.body);
     
     if (!result.success) {
-      return res.status(400).json({
+      res.status(400).json({
         status: 'error',
         error: {
           code: 'VALIDATION_ERROR',
@@ -112,6 +127,7 @@ export function validateBody(schemaName: string) {
           }))
         }
       });
+      return;
     }
     
     req.body = result.data;
@@ -123,11 +139,11 @@ export function validateBody(schemaName: string) {
  * Validation middleware for query parameters
  */
 export function validateQuery(schemaName: string) {
-  return (req: any, res: any, next: any) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     const result = ValidationRegistry.safeValidate(schemaName, req.query);
     
     if (!result.success) {
-      return res.status(400).json({
+      res.status(400).json({
         status: 'error',
         error: {
           code: 'VALIDATION_ERROR',
@@ -140,6 +156,7 @@ export function validateQuery(schemaName: string) {
           }))
         }
       });
+      return;
     }
     
     req.query = result.data;
@@ -151,11 +168,11 @@ export function validateQuery(schemaName: string) {
  * Validation middleware for path parameters
  */
 export function validateParams(schemaName: string) {
-  return (req: any, res: any, next: any) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     const result = ValidationRegistry.safeValidate(schemaName, req.params);
     
     if (!result.success) {
-      return res.status(400).json({
+      res.status(400).json({
         status: 'error',
         error: {
           code: 'VALIDATION_ERROR',
@@ -168,6 +185,7 @@ export function validateParams(schemaName: string) {
           }))
         }
       });
+      return;
     }
     
     req.params = result.data;
@@ -184,9 +202,16 @@ export interface ValidationOptions {
   params?: string;
 }
 
+interface ValidationError {
+  location: string;
+  field: string;
+  message: string;
+  constraint: string;
+}
+
 export function validate(options: ValidationOptions) {
-  return (req: any, res: any, next: any) => {
-    const errors: any[] = [];
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const errors: ValidationError[] = [];
     
     if (options.body) {
       const result = ValidationRegistry.safeValidate(options.body, req.body);
@@ -195,7 +220,6 @@ export function validate(options: ValidationOptions) {
           location: 'body',
           field: e.path.join('.'),
           message: e.message,
-          value: e.input,
           constraint: e.code
         })));
       } else {
@@ -210,7 +234,6 @@ export function validate(options: ValidationOptions) {
           location: 'query',
           field: e.path.join('.'),
           message: e.message,
-          value: e.input,
           constraint: e.code
         })));
       } else {
@@ -225,7 +248,6 @@ export function validate(options: ValidationOptions) {
           location: 'params',
           field: e.path.join('.'),
           message: e.message,
-          value: e.input,
           constraint: e.code
         })));
       } else {
@@ -234,7 +256,7 @@ export function validate(options: ValidationOptions) {
     }
     
     if (errors.length > 0) {
-      return res.status(400).json({
+      res.status(400).json({
         status: 'error',
         error: {
           code: 'VALIDATION_ERROR',
@@ -242,6 +264,7 @@ export function validate(options: ValidationOptions) {
           validationErrors: errors
         }
       });
+      return;
     }
     
     next();
@@ -249,3 +272,4 @@ export function validate(options: ValidationOptions) {
 }
 
 // Export validation utilities
+export { z } from 'zod';

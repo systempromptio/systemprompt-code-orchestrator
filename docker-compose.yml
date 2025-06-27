@@ -7,13 +7,15 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - NODE_ENV=production
       - PORT=3000
       - STATE_PATH=/data/state
       - PROJECTS_PATH=/data/projects
       - FILE_ROOT=/workspace
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}  # Commented out - using authenticated user session
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     env_file:
       - .env
@@ -26,6 +28,8 @@ services:
       - ${HOST_FILE_ROOT:-/var/www/html/systemprompt-coding-agent}:/workspace:rw
       # Docker socket for container management (optional)
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Mount Claude authentication if it exists
+      - ${HOME}/.claude.json:/home/appuser/.claude.json:ro
     restart: unless-stopped
 
   cloudflared:

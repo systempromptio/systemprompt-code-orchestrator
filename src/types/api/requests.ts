@@ -7,7 +7,7 @@ export interface ApiRequest<T = unknown> {
   readonly params?: Record<string, string>;
   readonly query?: Record<string, string | string[]>;
   readonly body?: T;
-  readonly context: RequestContext;
+  readonly context: ApiRequestContext;
 }
 
 export interface RequestHeaders {
@@ -19,7 +19,7 @@ export interface RequestHeaders {
   readonly [key: string]: string | undefined;
 }
 
-export interface RequestContext {
+export interface ApiRequestContext {
   readonly requestId: string;
   readonly timestamp: Date;
   readonly method: string;
