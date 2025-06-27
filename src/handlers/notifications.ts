@@ -36,6 +36,18 @@ type RootsListChangedNotification = {
   params?: Record<string, never>;
 };
 
+type ResourcesUpdatedNotification = {
+  method: "notifications/resources/updated";
+  params: {
+    uri: string;
+  };
+};
+
+type ResourcesListChangedNotification = {
+  method: "notifications/resources/list_changed";
+  params?: Record<string, never>;
+};
+
 export async function sendOperationNotification(operation: string, message: string, sessionId?: string): Promise<void> {
   const notification: ServerNotification = {
     method: "notifications/message",
@@ -113,8 +125,24 @@ export async function sendRootsListChangedNotification(): Promise<void> {
   await sendNotification(notification);
 }
 
+export async function sendResourcesUpdatedNotification(uri: string, sessionId?: string): Promise<void> {
+  const notification: ResourcesUpdatedNotification = {
+    method: "notifications/resources/updated",
+    params: { uri }
+  };
+  await sendNotification(notification, sessionId);
+}
+
+export async function sendResourcesListChangedNotification(sessionId?: string): Promise<void> {
+  const notification: ResourcesListChangedNotification = {
+    method: "notifications/resources/list_changed",
+    params: {}
+  };
+  await sendNotification(notification, sessionId);
+}
+
 async function sendNotification(
-  notification: ServerNotification | SamplingCompleteNotification | RedditConfigNotification | ProgressNotification | RootsListChangedNotification,
+  notification: ServerNotification | SamplingCompleteNotification | RedditConfigNotification | ProgressNotification | RootsListChangedNotification | ResourcesUpdatedNotification | ResourcesListChangedNotification,
   sessionId?: string
 ) {
   const handler = getMCPHandlerInstance();

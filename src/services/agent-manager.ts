@@ -114,6 +114,21 @@ export class AgentManager extends EventEmitter {
     this.sessions.set(sessionId, session);
     this.emit('session:created', { sessionId, type: 'claude' });
     
+    // Log session creation
+    if (config.task_id) {
+      const taskStore = await import('./task-store.js');
+      await taskStore.TaskStore.getInstance().addLog(
+        config.task_id,
+        `[SESSION_CREATED] Claude Code session created: ${sessionId}, working directory: ${config.project_path}`
+      );
+      if (config.initial_context) {
+        await taskStore.TaskStore.getInstance().addLog(
+          config.task_id,
+          `[SESSION_CONTEXT] Initial context provided: ${config.initial_context.substring(0, 200)}...`
+        );
+      }
+    }
+    
     // Listen for task progress events
     this.claudeService.on('task:progress', (progress) => {
       if (progress.taskId === config.task_id) {
@@ -193,25 +208,56 @@ export class AgentManager extends EventEmitter {
     session.status = 'busy';
     session.last_activity = new Date().toISOString();
     
+    // Log command being sent
+    if (session.taskId) {
+      const taskStore = await import('./task-store.js');
+      await taskStore.TaskStore.getInstance().addLog(
+        session.taskId,
+        `[COMMAND_SENT] ${command.command}`
+      );
+    }
+    
     try {
       if (session.type === 'claude') {
         // Use Claude service
+        const startTime = Date.now();
         const output = await this.claudeService.querySync(
           session.serviceSessionId, 
           command.command,
           { maxTurns: 1 }
         );
+        const duration = Date.now() - startTime;
         
         session.output_buffer.push(output);
         session.status = 'active';
         
+        // Log response received
+        if (session.taskId) {
+          const taskStore = await import('./task-store.js');
+          await taskStore.TaskStore.getInstance().addLog(
+            session.taskId,
+            `[RESPONSE_RECEIVED] Duration: ${duration}ms, Output length: ${output.length} chars`
+          );
+          
+          // Log first 500 chars of response for context
+          if (output.length > 0) {
+            const preview = output.substring(0, 500);
+            await taskStore.TaskStore.getInstance().addLog(
+              session.taskId,
+              `[RESPONSE_PREVIEW] ${preview}${output.length > 500 ? '...' : ''}`
+            );
+          }
+        }
+        
         return {
           success: true,
-          output
+          output,
+          duration
         };
         
       } else if (session.type === 'gemini') {
         // Use Gemini service
+        const startTime = Date.now();
         const responses: string[] = [];
         
         const geminiResponses = await this.geminiService.sendPrompt(
@@ -225,6 +271,16 @@ export class AgentManager extends EventEmitter {
           }
           if (response.error) {
             session.status = 'active';
+            
+            // Log error
+            if (session.taskId) {
+              const taskStore = await import('./task-store.js');
+              await taskStore.TaskStore.getInstance().addLog(
+                session.taskId,
+                `[GEMINI_ERROR] ${response.error}`
+              );
+            }
+            
             return {
               success: false,
               error: response.error
@@ -233,12 +289,23 @@ export class AgentManager extends EventEmitter {
         }
         
         const output = responses.join('\n');
+        const duration = Date.now() - startTime;
         session.output_buffer.push(output);
         session.status = 'active';
         
+        // Log response
+        if (session.taskId) {
+          const taskStore = await import('./task-store.js');
+          await taskStore.TaskStore.getInstance().addLog(
+            session.taskId,
+            `[GEMINI_RESPONSE] Duration: ${duration}ms, Response count: ${responses.length}`
+          );
+        }
+        
         return {
           success: true,
-          output
+          output,
+          duration
         };
       }
       
@@ -246,6 +313,16 @@ export class AgentManager extends EventEmitter {
       
     } catch (error) {
       session.status = 'active';
+      
+      // Log error
+      if (session.taskId) {
+        const taskStore = await import('./task-store.js');
+        await taskStore.TaskStore.getInstance().addLog(
+          session.taskId,
+          `[COMMAND_ERROR] ${error instanceof Error ? error.message : 'Command failed'}`
+        );
+      }
+      
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Command failed'
@@ -258,6 +335,15 @@ export class AgentManager extends EventEmitter {
     if (!session) return false;
     
     try {
+      // Log session termination
+      if (session.taskId) {
+        const taskStore = await import('./task-store.js');
+        await taskStore.TaskStore.getInstance().addLog(
+          session.taskId,
+          `[SESSION_ENDING] Terminating ${session.type} session: ${sessionId}`
+        );
+      }
+      
       if (session.type === 'claude') {
         await this.claudeService.endSession(session.serviceSessionId);
       } else if (session.type === 'gemini') {
@@ -267,9 +353,28 @@ export class AgentManager extends EventEmitter {
       session.status = 'terminated';
       this.sessions.delete(sessionId);
       
+      // Log successful termination
+      if (session.taskId) {
+        const taskStore = await import('./task-store.js');
+        await taskStore.TaskStore.getInstance().addLog(
+          session.taskId,
+          `[SESSION_TERMINATED] ${session.type} session ended successfully: ${sessionId}`
+        );
+      }
+      
       return true;
     } catch (error) {
       console.error('Error ending session:', error);
+      
+      // Log error
+      if (session.taskId) {
+        const taskStore = await import('./task-store.js');
+        await taskStore.TaskStore.getInstance().addLog(
+          session.taskId,
+          `[SESSION_ERROR] Failed to end session: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      }
+      
       return false;
     }
   }

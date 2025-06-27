@@ -49,10 +49,7 @@ async function main() {
           title: task.title,
           tool: 'CLAUDECODE',
           instructions: task.command,
-          project_path: '/workspace',
-          branch: `demo/concurrent-${timestamp}-task${index + 1}`,
-          priority: 'high',
-          start_immediately: true
+          branch: `demo/concurrent-${timestamp}-task${index + 1}`
         }
       });
       

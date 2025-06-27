@@ -35,42 +35,64 @@ export const FIX_BUG_PROMPT: Prompt = {
       role: 'user',
       content: {
         type: 'text',
-        text: 'Fix this bug: {{bug_description}}\n\nError: {{error_message}}\nFiles: {{affected_files}}\nSteps to reproduce: {{reproduction_steps}}',
-      },
-    },
-    {
-      role: 'assistant',
-      content: {
-        type: 'text',
-        text: `I'll help you diagnose and fix this bug systematically.
+        text: `# Bug Fix Task
 
-**Bug Investigation Process:**
+## Bug Description
+{{bug_description}}
 
-1. **Error Analysis**
-   - Parse error messages and stack traces
-   - Identify the error type and location
-   - Understand the failure context
-   - Check for related issues
+## Error Information
+{{error_message}}
 
-2. **Root Cause Analysis**
-   - Trace execution flow
-   - Examine variable states
-   - Check data transformations
-   - Identify edge cases
+## Affected Files
+{{affected_files}}
 
-3. **Debugging Strategy**
-   - Add strategic logging
-   - Use debugger breakpoints
-   - Isolate the problem
-   - Test hypotheses
+## Reproduction Steps
+{{reproduction_steps}}
 
-4. **Fix Implementation**
-   - Apply minimal necessary changes
-   - Handle edge cases properly
-   - Add defensive coding
-   - Prevent regression
+## Instructions
 
-I'll investigate the issue thoroughly and provide a robust fix.`,
+You are tasked with diagnosing and fixing this bug. Follow this systematic approach:
+
+### 1. Error Analysis
+- Parse and understand the error message and stack trace
+- Identify the exact error type, location, and failure context
+- Search for similar or related issues in the codebase
+- Document your understanding of what's failing and why
+
+### 2. Root Cause Investigation
+- Trace the execution flow leading to the error
+- Examine the state of variables at the point of failure
+- Analyze data transformations and type conversions
+- Identify edge cases or unexpected inputs
+- Check for race conditions or timing issues
+
+### 3. Debugging Implementation
+- Add strategic console.log statements or debugging output
+- Use appropriate debugging tools for the language/framework
+- Isolate the problem to the smallest reproducible case
+- Test your hypotheses systematically
+- Document each finding
+
+### 4. Fix Development
+- Implement the minimal necessary changes to fix the bug
+- Handle all identified edge cases properly
+- Add defensive programming measures to prevent similar issues
+- Ensure the fix doesn't introduce regression
+- Add appropriate error handling and validation
+
+### 5. Testing & Validation
+- Verify the bug is fixed with the original reproduction steps
+- Test edge cases and boundary conditions
+- Ensure no existing functionality is broken
+- Add unit tests to prevent regression
+- Update documentation if needed
+
+### Output Requirements
+- Provide a clear explanation of the root cause
+- Show the exact code changes needed
+- Include any new tests or validation logic
+- Document any assumptions or limitations
+- Suggest preventive measures for similar bugs`,
       },
     },
   ],
@@ -101,48 +123,77 @@ export const DEBUG_ASYNC_ISSUE_PROMPT: Prompt = {
       role: 'user',
       content: {
         type: 'text',
-        text: 'Debug this async issue: {{issue_description}}\nSymptoms: {{symptoms}}\nAsync operations: {{async_operations}}',
-      },
-    },
-    {
-      role: 'assistant',
-      content: {
-        type: 'text',
-        text: `I'll help you debug and fix this asynchronous issue.
+        text: `# Asynchronous Issue Debugging Task
 
-**Async Debugging Approach:**
+## Issue Description
+{{issue_description}}
 
-1. **Issue Identification**
-   - Race conditions
-   - Incorrect promise handling
-   - Missing await keywords
-   - Callback hell
-   - Event loop blocking
+## Observed Symptoms
+{{symptoms}}
 
-2. **Analysis Tools**
-   - Add timing logs
-   - Trace async execution flow
-   - Monitor promise states
-   - Check for unhandled rejections
+## Async Operations Involved
+{{async_operations}}
 
-3. **Common Fixes**
-   - Proper async/await usage
-   - Promise.all for parallel operations
-   - Sequential processing when needed
-   - Timeout handling
-   - Error boundaries for async errors
+## Instructions
 
-4. **Prevention Strategies**
-   - Use async patterns consistently
-   - Add proper error handling
-   - Implement retry logic
-   - Add concurrency controls
+Debug and fix this asynchronous/timing issue using the following systematic approach:
 
-I'll trace through the async flow and implement a reliable solution.`,
+### 1. Issue Classification
+Identify the type of async issue:
+- Race conditions between competing operations
+- Incorrect promise handling or chaining
+- Missing await keywords causing premature execution
+- Callback hell or pyramid of doom patterns
+- Event loop blocking from synchronous operations
+- Deadlocks from circular dependencies
+- Memory leaks from unresolved promises
+
+### 2. Diagnostic Analysis
+- Add timestamp logging before and after each async operation
+- Trace the complete async execution flow
+- Monitor promise states (pending, fulfilled, rejected)
+- Check for unhandled promise rejections
+- Identify operations that should be sequential vs parallel
+- Measure actual execution order vs expected order
+- Look for shared state mutations
+
+### 3. Implementation Solutions
+- Convert callback-based code to async/await for clarity
+- Use Promise.all() for truly parallel operations
+- Use Promise.allSettled() when you need all results regardless of failures
+- Implement proper sequential processing with for-await loops
+- Add timeout handling with Promise.race()
+- Create error boundaries for async error propagation
+- Use mutex/semaphore patterns for resource access control
+- Implement proper cleanup in finally blocks
+
+### 4. Error Handling Strategy
+- Wrap async operations in try-catch blocks
+- Implement exponential backoff for retry logic
+- Add circuit breakers for failing services
+- Use proper error propagation patterns
+- Log errors with full context
+- Implement graceful degradation
+
+### 5. Prevention & Best Practices
+- Establish consistent async patterns across the codebase
+- Use TypeScript to catch promise handling errors
+- Implement integration tests for async flows
+- Add concurrency controls (rate limiting, connection pooling)
+- Document async contracts and dependencies
+- Use observability tools for production monitoring
+
+### Output Requirements
+- Detailed explanation of the root cause
+- Step-by-step fix implementation
+- Before/after code comparison
+- Test cases covering the async scenarios
+- Performance impact analysis
+- Recommendations for preventing similar issues`,
       },
     },
   ],
-};
+}
 
 export const FIX_MEMORY_LEAK_PROMPT: Prompt = {
   name: 'fix_memory_leak',
@@ -169,45 +220,99 @@ export const FIX_MEMORY_LEAK_PROMPT: Prompt = {
       role: 'user',
       content: {
         type: 'text',
-        text: 'Fix memory leak with symptoms: {{symptoms}}\nSuspected areas: {{suspected_areas}}\nProfiler data: {{profiler_data}}',
-      },
-    },
-    {
-      role: 'assistant',
-      content: {
-        type: 'text',
-        text: `I'll help you identify and fix the memory leak.
+        text: `# Memory Leak Fix Task
 
-**Memory Leak Detection:**
+## Symptoms
+{{symptoms}}
 
-1. **Common Leak Sources**
-   - Event listeners not removed
-   - Timers not cleared
-   - Closures holding references
-   - DOM references in JavaScript
-   - Large objects in caches
+## Suspected Areas
+{{suspected_areas}}
 
-2. **Investigation Steps**
-   - Profile memory usage over time
-   - Take heap snapshots
-   - Compare object allocations
-   - Track retained objects
-   - Find detached DOM nodes
+## Profiler Data
+{{profiler_data}}
 
-3. **Fix Strategies**
-   - Remove event listeners on cleanup
-   - Clear intervals and timeouts
-   - Weak references for caches
-   - Proper component unmounting
-   - Limit cache sizes
+## Instructions
 
-4. **Prevention**
-   - Use cleanup functions
-   - Implement disposal patterns
-   - Monitor memory in tests
-   - Use memory-safe patterns
+Identify and fix memory leaks using this comprehensive approach:
 
-I'll systematically find and eliminate the memory leaks.`,
+### 1. Leak Source Identification
+Investigate common memory leak sources:
+- **Event Listeners**: Not removed when components unmount
+- **Timers**: setInterval/setTimeout not cleared
+- **Closures**: Functions holding references to large objects
+- **DOM References**: JavaScript keeping references to removed DOM nodes
+- **Caches**: Unbounded caches growing without limits
+- **Global Variables**: Accidental globals holding data
+- **Circular References**: Objects referencing each other
+- **WebSocket/SSE**: Connections not properly closed
+- **Worker Threads**: Not terminated properly
+- **External Libraries**: Third-party code leaking memory
+
+### 2. Diagnostic Process
+- Take initial heap snapshot as baseline
+- Perform the actions that cause memory growth
+- Take another heap snapshot
+- Compare snapshots to find growing objects
+- Use Chrome DevTools "Allocation Timeline" to track allocations
+- Identify retained objects and their retainer chains
+- Look for detached DOM trees
+- Check for growing array/object sizes
+- Monitor garbage collection frequency
+
+### 3. Analysis Techniques
+- Use performance.measureUserAgentSpecificMemory() for measurements
+- Add memory logging at strategic points
+- Track object counts and sizes over time
+- Use WeakMap/WeakSet for metadata storage
+- Implement memory profiling in tests
+- Monitor memory in production with tools
+
+### 4. Fix Implementation
+**Event Listener Management**:
+- Store listener references for removal
+- Use AbortController for multiple listeners
+- Implement proper cleanup in destroy/unmount methods
+
+**Timer Management**:
+- Store timer IDs and clear on cleanup
+- Use requestAnimationFrame with proper cancellation
+- Implement timeout wrappers with automatic cleanup
+
+**Reference Management**:
+- Nullify references in cleanup code
+- Use WeakRef for optional references
+- Implement proper disposal patterns
+- Clear caches periodically or use LRU eviction
+
+**Component Lifecycle**:
+- Implement componentWillUnmount/cleanup properly
+- Remove all subscriptions and listeners
+- Cancel pending async operations
+- Clear any component-specific caches
+
+### 5. Verification & Testing
+- Re-run memory profiling after fixes
+- Verify memory stabilizes over time
+- Add automated memory leak tests
+- Use tools like heapdump for Node.js
+- Implement memory budgets and alerts
+- Monitor memory metrics in production
+
+### 6. Prevention Strategies
+- Establish coding standards for cleanup
+- Use linting rules for common leak patterns
+- Implement resource management classes
+- Create reusable cleanup utilities
+- Regular memory audits in CI/CD
+- Document memory management patterns
+
+### Output Requirements
+- Identify specific objects/references causing leaks
+- Provide before/after memory profiles
+- Show exact code changes needed
+- Include cleanup implementation
+- Add tests to prevent regression
+- Document memory management best practices for the team`,
       },
     },
   ],
@@ -238,45 +343,141 @@ export const DEBUG_PRODUCTION_ISSUE_PROMPT: Prompt = {
       role: 'user',
       content: {
         type: 'text',
-        text: 'Debug production issue: {{issue_description}}\nEnvironment differences: {{environment_differences}}\nAvailable logs: {{logs_available}}',
-      },
-    },
-    {
-      role: 'assistant',
-      content: {
-        type: 'text',
-        text: `I'll help debug this production-specific issue systematically.
+        text: `# Production Issue Debugging Task
 
-**Production Debugging Strategy:**
+## Issue Description
+{{issue_description}}
 
-1. **Environment Analysis**
-   - Build/compilation differences
-   - Environment variables
-   - API endpoints and services
-   - CDN and caching issues
-   - Minification effects
+## Environment Differences
+{{environment_differences}}
 
-2. **Diagnostic Approach**
-   - Add production-safe logging
-   - Use feature flags for debugging
-   - Implement error tracking
-   - Monitor performance metrics
-   - Check browser compatibility
+## Available Logs/Monitoring
+{{logs_available}}
 
-3. **Common Production Issues**
-   - CORS and security policies
-   - HTTPS/SSL issues
-   - Load balancer problems
-   - Database connection pools
-   - Third-party service failures
+## Instructions
 
-4. **Safe Debugging**
-   - Use non-invasive techniques
-   - Test fixes in staging first
-   - Implement gradual rollouts
-   - Have rollback plans ready
+Debug this production-specific issue using safe, systematic approaches:
 
-I'll identify the root cause while minimizing production impact.`,
+### 1. Environment Comparison Analysis
+**Build & Compilation**:
+- Production build optimizations (minification, tree-shaking)
+- Source map availability and accuracy
+- Bundler configuration differences
+- Transpilation targets and polyfills
+- Dead code elimination effects
+
+**Configuration**:
+- Environment variables and secrets
+- API endpoints and service URLs
+- Feature flags and toggles
+- Third-party service configurations
+- Database connection strings
+
+**Infrastructure**:
+- CDN configuration and caching headers
+- Load balancer settings and health checks
+- SSL/TLS certificates and HTTPS redirects
+- Reverse proxy configurations
+- Container orchestration differences
+
+### 2. Diagnostic Strategy
+**Safe Logging Implementation**:
+- Add structured logging with correlation IDs
+- Use sampling to avoid log flooding
+- Implement log levels appropriate for production
+- Ensure no sensitive data in logs
+- Use centralized logging services
+
+**Monitoring Enhancement**:
+- Add custom metrics for the issue area
+- Implement distributed tracing
+- Set up error tracking with context
+- Monitor resource utilization
+- Track user journey analytics
+
+**Feature Flag Debugging**:
+- Create debug feature flags
+- Target specific users or percentages
+- Add verbose logging behind flags
+- Implement A/B testing for fixes
+- Use canary deployments
+
+### 3. Common Production-Only Issues
+**Security & Network**:
+- CORS policies blocking requests
+- Content Security Policy restrictions
+- Mixed content HTTPS/HTTP issues
+- Authentication token expiration
+- Rate limiting and throttling
+- Firewall or WAF rules
+
+**Performance & Scale**:
+- Database connection pool exhaustion
+- Memory limits in containers
+- CPU throttling under load
+- Disk space issues
+- Network timeouts
+- Queue backlog problems
+
+**External Dependencies**:
+- Third-party API failures
+- CDN availability issues
+- DNS resolution problems
+- Certificate expiration
+- Service version mismatches
+
+**Client-Side Issues**:
+- Browser compatibility problems
+- Ad blockers interfering
+- Browser extensions conflicts
+- Mobile-specific behaviors
+- Progressive Web App cache issues
+
+### 4. Investigation Techniques
+**Data Collection**:
+- Gather error reports from multiple sources
+- Correlate with deployment timeline
+- Check for patterns (time, geography, user type)
+- Review recent changes and deployments
+- Analyze traffic patterns
+
+**Reproduction Attempts**:
+- Use production-like staging environment
+- Simulate production load
+- Test with production data (anonymized)
+- Use same CDN and services
+- Match production configuration exactly
+
+### 5. Safe Fix Implementation
+**Testing Strategy**:
+- Implement fix in staging first
+- Use shadow/dark testing
+- Gradual rollout with monitoring
+- Have instant rollback ready
+- Document the fix thoroughly
+
+**Deployment Safety**:
+- Use blue-green deployments
+- Implement circuit breakers
+- Add health check endpoints
+- Monitor error rates during rollout
+- Keep stakeholders informed
+
+### 6. Post-Fix Actions
+- Add regression tests
+- Update monitoring and alerts
+- Document the issue and resolution
+- Conduct post-mortem analysis
+- Improve dev-prod parity
+- Update runbooks
+
+### Output Requirements
+- Root cause analysis with evidence
+- Environment-specific factors identified
+- Safe fix implementation plan
+- Rollback procedures
+- Monitoring additions needed
+- Lessons learned and prevention measures`,
       },
     },
   ],
@@ -312,46 +513,158 @@ export const FIX_PERFORMANCE_ISSUE_PROMPT: Prompt = {
       role: 'user',
       content: {
         type: 'text',
-        text: 'Fix performance issue: {{performance_issue}}\nMetrics: {{metrics}}\nUser impact: {{user_impact}}\nTarget: {{target_improvement}}',
-      },
-    },
-    {
-      role: 'assistant',
-      content: {
-        type: 'text',
-        text: `I'll analyze and fix the performance bottleneck to meet your targets.
+        text: `# Performance Optimization Task
 
-**Performance Analysis:**
+## Performance Issue
+{{performance_issue}}
 
-1. **Profiling**
-   - Measure current performance
-   - Identify bottlenecks
-   - Profile CPU and memory usage
-   - Analyze network requests
-   - Check rendering performance
+## Current Metrics
+{{metrics}}
 
-2. **Common Bottlenecks**
-   - Inefficient algorithms (O(n²) → O(n))
-   - Excessive DOM manipulation
-   - Unoptimized database queries
-   - Large bundle sizes
-   - Synchronous operations blocking UI
+## User Impact
+{{user_impact}}
 
-3. **Optimization Techniques**
-   - Algorithm optimization
-   - Caching strategies
-   - Lazy loading
-   - Code splitting
-   - Database query optimization
-   - CDN utilization
+## Target Improvement
+{{target_improvement}}
 
-4. **Validation**
-   - Benchmark improvements
-   - Load testing
-   - Real user monitoring
-   - Performance budgets
+## Instructions
 
-I'll implement targeted optimizations to achieve your performance goals.`,
+Diagnose and fix performance bottlenecks using this comprehensive approach:
+
+### 1. Performance Profiling
+**Measurement Tools**:
+- Browser DevTools Performance tab
+- Lighthouse for web vitals
+- Application Performance Monitoring (APM)
+- Custom performance marks and measures
+- Database query analyzers
+- Network waterfall analysis
+
+**Key Metrics to Analyze**:
+- Time to First Byte (TTFB)
+- First Contentful Paint (FCP)
+- Largest Contentful Paint (LCP)
+- Time to Interactive (TTI)
+- Cumulative Layout Shift (CLS)
+- Total Blocking Time (TBT)
+- Memory usage patterns
+- CPU utilization
+- Network request count and size
+
+### 2. Bottleneck Identification
+**Algorithm Analysis**:
+- Identify O(n²) or worse complexity
+- Find nested loops over large datasets
+- Detect redundant calculations
+- Look for recursive functions without memoization
+- Check sorting and searching efficiency
+
+**Frontend Performance**:
+- Excessive DOM manipulations
+- Layout thrashing (repeated style calculations)
+- Large JavaScript bundles blocking parsing
+- Render-blocking resources
+- Unoptimized images and media
+- Missing browser caching
+- Synchronous XHR requests
+
+**Backend Performance**:
+- N+1 database queries
+- Missing database indexes
+- Inefficient ORM usage
+- Synchronous I/O operations
+- Missing caching layers
+- API response payload size
+- Sequential operations that could be parallel
+
+### 3. Optimization Strategies
+**Algorithm Optimization**:
+- Replace inefficient algorithms with optimal ones
+- Implement memoization for expensive calculations
+- Use appropriate data structures (Map vs Array)
+- Batch operations where possible
+- Implement pagination or virtual scrolling
+
+**Code Splitting & Loading**:
+- Dynamic imports for route-based splitting
+- Lazy load below-the-fold content
+- Implement progressive enhancement
+- Use resource hints (preconnect, prefetch)
+- Optimize critical rendering path
+
+**Caching Implementation**:
+- Browser caching with proper headers
+- Service Worker for offline caching
+- CDN for static assets
+- Redis/Memcached for server-side caching
+- Database query result caching
+- Implement cache invalidation strategies
+
+**Database Optimization**:
+- Add appropriate indexes
+- Optimize query execution plans
+- Denormalize for read performance
+- Implement read replicas
+- Use database-specific optimizations
+- Consider NoSQL for appropriate use cases
+
+**Asset Optimization**:
+- Image compression and format selection
+- Responsive images with srcset
+- Font subsetting and optimization
+- Minification and compression
+- Tree shaking unused code
+- CSS and JavaScript optimization
+
+**Runtime Optimization**:
+- Debounce and throttle event handlers
+- Use requestAnimationFrame for animations
+- Implement virtual scrolling for long lists
+- Web Workers for CPU-intensive tasks
+- Optimize React re-renders
+- Use production builds
+
+### 4. Implementation Plan
+1. Establish baseline measurements
+2. Implement quick wins first
+3. Tackle algorithmic improvements
+4. Optimize critical path
+5. Add caching layers
+6. Implement lazy loading
+7. Optimize assets and bundles
+8. Fine-tune database queries
+
+### 5. Validation & Monitoring
+**Testing Strategy**:
+- A/B test performance changes
+- Load testing with realistic data
+- Synthetic monitoring
+- Real User Monitoring (RUM)
+- Performance regression tests
+- Mobile performance testing
+
+**Success Metrics**:
+- Meet target performance goals
+- Maintain functionality
+- No regression in other areas
+- Improved user experience metrics
+- Reduced infrastructure costs
+
+### 6. Long-term Maintenance
+- Set performance budgets
+- Automate performance testing
+- Regular performance audits
+- Monitor production metrics
+- Document optimization decisions
+- Train team on performance best practices
+
+### Output Requirements
+- Detailed performance analysis report
+- Specific bottlenecks identified with data
+- Optimization implementation with benchmarks
+- Before/after performance comparisons
+- Monitoring setup for ongoing tracking
+- Documentation of all changes made`,
       },
     },
   ],

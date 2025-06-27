@@ -1,0 +1,13 @@
+{
+  "name": "@systemprompt/claude-host-proxy",
+  "version": "1.0.0",
+  "description": "Host proxy for bridging Docker container to Claude CLI",
+  "main": "claude-host-proxy.js",
+  "scripts": {
+    "start": "node claude-host-proxy.js",
+    "start:daemon": "node start-daemon.js"
+  },
+  "keywords": ["claude", "proxy", "mcp"],
+  "author": "",
+  "license": "MIT"
+}

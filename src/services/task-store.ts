@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { StatePersistence } from './state-persistence.js';
+import { sendResourcesUpdatedNotification, sendResourcesListChangedNotification } from '../handlers/notifications.js';
 
 export interface Task {
   id: string;
@@ -101,6 +102,10 @@ export class TaskStore extends EventEmitter {
     this.tasks.set(task.id, task);
     await this.persistence.saveTask(task);
     this.emit('task:created', task);
+    
+    // Send MCP notifications
+    await sendResourcesListChangedNotification();
+    await sendResourcesUpdatedNotification(`task://${task.id}`);
   }
   
   async getTask(taskId: string): Promise<Task | null> {
@@ -120,6 +125,9 @@ export class TaskStore extends EventEmitter {
     this.tasks.set(taskId, updatedTask);
     await this.persistence.saveTask(updatedTask);
     this.emit('task:updated', updatedTask);
+    
+    // Send MCP notification for resource update
+    await sendResourcesUpdatedNotification(`task://${taskId}`);
     
     return updatedTask;
   }
@@ -155,6 +163,10 @@ export class TaskStore extends EventEmitter {
       task.updated_at = new Date().toISOString();
       await this.persistence.saveTask(task);
       this.emit('task:log', { taskId, log });
+      
+      // Send MCP notification for log update
+      await sendResourcesUpdatedNotification(`task://${taskId}`);
+      await sendResourcesUpdatedNotification(`task://${taskId}/logs`);
     }
   }
   
@@ -165,6 +177,9 @@ export class TaskStore extends EventEmitter {
       task.updated_at = new Date().toISOString();
       await this.persistence.saveTask(task);
       this.emit('task:progress', { taskId, progress: task.progress });
+      
+      // Send MCP notification for progress update
+      await sendResourcesUpdatedNotification(`task://${taskId}`);
     }
   }
 

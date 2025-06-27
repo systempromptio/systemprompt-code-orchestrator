@@ -31,10 +31,7 @@ const ToolSchemas = {
     title: z.string(),
     tool: z.enum(["CLAUDECODE", "GEMINICLI"]),
     instructions: z.string(),
-    project_path: z.string(),
-    branch: z.string(),
-    priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
-    start_immediately: z.boolean().default(true)
+    branch: z.string()
   }),
   
   update_task: z.object({

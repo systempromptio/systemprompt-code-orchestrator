@@ -63,32 +63,61 @@ export class ClaudeCodeService extends EventEmitter {
     }
   }
   
-  private parseProgressFromStream(session: ClaudeCodeSession, data: string): void {
+  private async parseProgressFromStream(session: ClaudeCodeSession, data: string): Promise<void> {
     if (!session.taskId) return;
+    
+    // Import TaskStore for logging
+    const { TaskStore } = await import('./task-store.js');
+    const taskStore = TaskStore.getInstance();
+    
+    // Log raw stream data for comprehensive tracking
+    await taskStore.addLog(session.taskId, `[STREAM] ${data}`);
     
     // Parse common progress indicators
     const progressPatterns = [
-      { pattern: /Creating branch ([\w\/-]+)/, event: 'branch:created' },
-      { pattern: /Switched to .*branch '([\w\/-]+)'/, event: 'branch:switched' },
-      { pattern: /Creating file: (.+)/, event: 'file:creating' },
-      { pattern: /File created: (.+)/, event: 'file:created' },
-      { pattern: /Running tests/, event: 'tests:running' },
-      { pattern: /Tests passed/, event: 'tests:passed' },
-      { pattern: /Building project/, event: 'build:started' },
-      { pattern: /Build complete/, event: 'build:complete' },
-      { pattern: /Executing: (.+)/, event: 'command:executing' },
-      { pattern: /✓ (.+)/, event: 'step:completed' },
-      { pattern: /Task completed/, event: 'task:completed' }
+      { pattern: /Creating branch ([\w\/-]+)/, event: 'branch:created', logPrefix: 'BRANCH_CREATED' },
+      { pattern: /Switched to .*branch '([\w\/-]+)'/, event: 'branch:switched', logPrefix: 'BRANCH_SWITCHED' },
+      { pattern: /Creating file: (.+)/, event: 'file:creating', logPrefix: 'FILE_CREATING' },
+      { pattern: /File created: (.+)/, event: 'file:created', logPrefix: 'FILE_CREATED' },
+      { pattern: /Reading file: (.+)/, event: 'file:reading', logPrefix: 'FILE_READING' },
+      { pattern: /Writing file: (.+)/, event: 'file:writing', logPrefix: 'FILE_WRITING' },
+      { pattern: /Editing file: (.+)/, event: 'file:editing', logPrefix: 'FILE_EDITING' },
+      { pattern: /Running tests/, event: 'tests:running', logPrefix: 'TESTS_RUNNING' },
+      { pattern: /Tests passed/, event: 'tests:passed', logPrefix: 'TESTS_PASSED' },
+      { pattern: /Tests failed/, event: 'tests:failed', logPrefix: 'TESTS_FAILED' },
+      { pattern: /Building project/, event: 'build:started', logPrefix: 'BUILD_STARTED' },
+      { pattern: /Build complete/, event: 'build:complete', logPrefix: 'BUILD_COMPLETE' },
+      { pattern: /Build failed/, event: 'build:failed', logPrefix: 'BUILD_FAILED' },
+      { pattern: /Executing: (.+)/, event: 'command:executing', logPrefix: 'COMMAND_EXECUTING' },
+      { pattern: /Command output: (.+)/, event: 'command:output', logPrefix: 'COMMAND_OUTPUT' },
+      { pattern: /✓ (.+)/, event: 'step:completed', logPrefix: 'STEP_COMPLETED' },
+      { pattern: /× (.+)/, event: 'step:failed', logPrefix: 'STEP_FAILED' },
+      { pattern: /Error: (.+)/, event: 'error:occurred', logPrefix: 'ERROR' },
+      { pattern: /Warning: (.+)/, event: 'warning:occurred', logPrefix: 'WARNING' },
+      { pattern: /git add (.+)/, event: 'git:add', logPrefix: 'GIT_ADD' },
+      { pattern: /git commit -m "(.+)"/, event: 'git:commit', logPrefix: 'GIT_COMMIT' },
+      { pattern: /git push/, event: 'git:push', logPrefix: 'GIT_PUSH' },
+      { pattern: /npm install/, event: 'npm:install', logPrefix: 'NPM_INSTALL' },
+      { pattern: /npm run (.+)/, event: 'npm:run', logPrefix: 'NPM_RUN' },
+      { pattern: /\{[\s\S]*\}/, event: 'json:output', logPrefix: 'JSON_OUTPUT' },
+      { pattern: /```json[\s\S]*?```/, event: 'json:block', logPrefix: 'JSON_BLOCK' },
+      { pattern: /```[\w]*\n[\s\S]*?```/, event: 'code:block', logPrefix: 'CODE_BLOCK' }
     ];
     
-    for (const { pattern, event } of progressPatterns) {
+    for (const { pattern, event, logPrefix } of progressPatterns) {
       const match = data.match(pattern);
       if (match) {
+        const eventData = match[1] || match[0] || data;
+        
+        // Log specific event
+        await taskStore.addLog(session.taskId, `[${logPrefix}] ${eventData}`);
+        
+        // Emit progress event
         this.emit('task:progress', {
           sessionId: session.id,
           taskId: session.taskId,
           event,
-          data: match[1] || data,
+          data: eventData,
           timestamp: new Date()
         });
       }
@@ -138,7 +167,13 @@ export class ClaudeCodeService extends EventEmitter {
         console.log(`[ClaudeCodeService] Mapped Docker path ${workingDirectory} to host path ${hostWorkingDirectory}`);
       }
       
-      const client = net.createConnection({ port: 9876, host: 'host.docker.internal' }, () => {
+      // Use environment variable for host, with fallback options
+      const proxyHost = process.env.CLAUDE_PROXY_HOST || 'host.docker.internal';
+      const proxyPort = parseInt(process.env.CLAUDE_PROXY_PORT || '9876', 10);
+      
+      console.log(`[ClaudeCodeService] Connecting to host proxy at ${proxyHost}:${proxyPort}`);
+      
+      const client = net.createConnection({ port: proxyPort, host: proxyHost }, () => {
         console.log('[ClaudeCodeService] Connected to host proxy');
         
         const message = JSON.stringify({
@@ -183,8 +218,10 @@ export class ClaudeCodeService extends EventEmitter {
                     if (session) {
                       session.streamBuffer.push(response.data);
                       
-                      // Parse for progress indicators
-                      this.parseProgressFromStream(session, response.data);
+                      // Parse for progress indicators (fire and forget)
+                      this.parseProgressFromStream(session, response.data).catch(err => {
+                        console.error('[ClaudeCodeService] Error parsing progress:', err);
+                      });
                     }
                   }
                   break;
@@ -325,6 +362,27 @@ export class ClaudeCodeService extends EventEmitter {
             messages.push(message);
             session.outputBuffer.push(message);
             session.lastActivity = new Date();
+            
+            // Log all message content to task
+            if (session.taskId && message.type === 'assistant' && message.message?.content) {
+              const { TaskStore } = await import('./task-store.js');
+              const taskStore = TaskStore.getInstance();
+              
+              // Process each content item
+              if (Array.isArray(message.message.content)) {
+                for (const item of message.message.content) {
+                  if (item.type === 'text' && item.text) {
+                    // Log the full text content
+                    await taskStore.addLog(session.taskId, `[ASSISTANT_MESSAGE] ${item.text}`);
+                    
+                    // Also parse it for progress
+                    await this.parseProgressFromStream(session, item.text);
+                  } else if (item.type === 'tool_use') {
+                    await taskStore.addLog(session.taskId, `[TOOL_USE] ${item.name || 'unknown'}: ${JSON.stringify(item.input || {})}`);
+                  }
+                }
+              }
+            }
           }
         } catch (error) {
           // If aborted, this is expected

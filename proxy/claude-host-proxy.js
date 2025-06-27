@@ -8,7 +8,7 @@
  */
 
 const net = require('net');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -59,10 +59,23 @@ function handleConnection(socket) {
       const args = ['-p', '--output-format', 'json', '--dangerously-skip-permissions', '--max-turns', '5', message.command];
       log(`[Claude Host Proxy] Running claude with args:`, args);
       
-      currentProcess = spawn('claude', args, {
+      // Get tool path from environment
+      const claudePath = process.env.CLAUDE_PATH;
+      
+      if (!claudePath) {
+        throw new Error('CLAUDE_PATH not set - Claude not available on host');
+      }
+      
+      // Execute claude - since it's a shell script, we need to use spawn with shell:true
+      log(`[Claude Host Proxy] Executing: ${claudePath} ${args.join(' ')}`);
+      
+      // Spawn with shell:true to handle shell scripts
+      // Use the detected shell path from environment
+      const shellPath = process.env.SHELL_PATH || '/usr/bin/sh';
+      currentProcess = spawn(claudePath, args, {
         cwd: message.workingDirectory || process.cwd(),
         env: process.env,
-        shell: true
+        shell: shellPath  // Use detected shell path
       });
       
       log(`[Claude Host Proxy] Spawned Claude process with PID: ${currentProcess.pid}`);

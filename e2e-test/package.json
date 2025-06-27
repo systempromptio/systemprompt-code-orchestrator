@@ -13,6 +13,7 @@
     "test:prompts": "node dist/typescript/test-prompts.js",
     "test:resources": "node dist/typescript/test-resources.js",
     "test:concurrent": "node dist/typescript/test-concurrent.js",
+    "test:logging": "node dist/test-task-logging.js",
     "test:bash": "bash bash-scripts/run-all.sh",
     "test:docker": "docker-compose -f ../../docker-compose.yml up -d && npm test && docker-compose -f ../../docker-compose.yml down",
     "clean": "rm -rf dist node_modules",

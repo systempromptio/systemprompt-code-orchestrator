@@ -19,6 +19,7 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     env_file:
       - .env
+      - .env.tools
     volumes:
       # Persistent state storage
       - coding-agent-state:/data/state
