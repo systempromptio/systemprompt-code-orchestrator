@@ -1,0 +1,29 @@
+{
+  "name": "mcp-test-suite",
+  "version": "2.0.0",
+  "description": "World-class test suite for Reddit MCP Server",
+  "type": "module",
+  "scripts": {
+    "check-env": "node scripts/check-env.js",
+    "build": "tsc",
+    "test": "npm run check-env && npm run build && npm run test:all",
+    "test:all": "node dist/index.js",
+    "test:tools": "node dist/typescript/test-tools.js",
+    "test:prompts": "node dist/typescript/test-prompts.js",
+    "test:resources": "node dist/typescript/test-resources.js",
+    "test:sampling": "node dist/typescript/test-sampling.js",
+    "test:concurrent": "node dist/typescript/test-concurrent.js",
+    "test:bash": "bash bash-scripts/run-all.sh",
+    "test:docker": "docker-compose -f ../../docker-compose.yml up -d && npm test && docker-compose -f ../../docker-compose.yml down",
+    "clean": "rm -rf dist node_modules",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.1",
+    "dotenv": "^16.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

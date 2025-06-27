@@ -1,0 +1,86 @@
+{
+  "name": "@systemprompt/systemprompt-mcp-server",
+  "version": "1.0.1",
+  "description": "Complete example MCP server implementation with full specification support, type safety, and production-ready architecture. Demonstrates OAuth 2.1, tools, prompts, sampling, and notifications using Reddit as a real-world integration.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./build/index.d.ts",
+      "default": "./build/index.js"
+    }
+  },
+  "bin": {
+    "systemprompt-mcp-server": "build/index.js"
+  },
+  "files": [
+    "build",
+    "README.md",
+    "LICENSE",
+    ".env.example"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsc && tsc-alias && chmod +x build/index.js && echo \"export * from './config.js';\nexport * from './oauth.js';\nexport * from './mcp.js';\nexport * from './auth-store.js';\nexport * from './types.js';\" > build/server/index.js",
+    "watch": "tsc --watch",
+    "docker": "docker-compose build && docker-compose up -d",
+    "test": "cd e2e-test && npm test",
+    "inspector": "npx @modelcontextprotocol/inspector",
+    "e2e": "cd e2e-test && npm install && npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/systempromptio/systemprompt-mcp-server.git"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.0",
+    "ajv-formats": "^3.0.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "jose": "^6.0.11",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.9",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/json-schema": "^7.0.15",
+    "@types/node": "^22.15.32",
+    "@typescript-eslint/eslint-plugin": "^8.34.1",
+    "@typescript-eslint/parser": "^8.34.1",
+    "eslint": "^9.29.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-prettier": "^5.5.0",
+    "prettier": "^3.5.3",
+    "tsc-alias": "^1.8.16",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  },
+  "keywords": [
+    "systemprompt",
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "mcp-example",
+    "typescript",
+    "type-safe",
+    "oauth2",
+    "reddit",
+    "example",
+    "template",
+    "boilerplate"
+  ],
+  "author": "SystemPrompt",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/systempromptio/systemprompt-mcp-server/issues"
+  },
+  "homepage": "https://systemprompt.io",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

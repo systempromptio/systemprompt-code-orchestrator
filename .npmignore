@@ -1,0 +1,46 @@
+# Source files (only ship built files)
+src/
+scripts/
+coverage/
+
+# Config files
+.env*
+!.env.example
+tsconfig.json
+.eslintrc*
+.prettierrc*
+jest.config.*
+
+# Development
+node_modules/
+*.log
+.git/
+.github/
+.vscode/
+.idea/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation (except main README)
+docs/
+*.md
+!README.md
+!LICENSE
+
+# Testing
+__tests__/
+*.test.ts
+*.spec.ts
+
+# Temporary
+*.tmp
+*.temp
+output/
+agent/
+
+# OS
+.DS_Store
+Thumbs.db
