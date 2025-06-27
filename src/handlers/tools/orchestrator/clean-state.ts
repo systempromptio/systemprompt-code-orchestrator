@@ -1,8 +1,3 @@
-/**
- * @file Clean state handler
- * @module handlers/tools/orchestrator/clean-state
- */
-
 import { z } from "zod";
 import { formatToolResponse } from "../types.js";
 import { logger } from "../../../utils/logger.js";
@@ -20,13 +15,42 @@ const CleanStateSchema = z.object({
 
 type CleanStateArgs = z.infer<typeof CleanStateSchema>;
 
+interface CleanupStats {
+  tasks: {
+    total: number;
+    removed: number;
+    kept: number;
+  };
+  sessions: {
+    total: number;
+    terminated: number;
+    kept: number;
+  };
+}
+
+interface CleanupItem {
+  type: 'task' | 'session';
+  id: string;
+  title?: string;
+  status: string;
+  branch?: string;
+  updated_at?: string;
+  workingDirectory?: string;
+  lastActivity?: string;
+}
+
+/**
+ * Cleans up system state by removing completed tasks and inactive sessions
+ * @param args - Cleanup configuration parameters
+ * @returns Summary of cleaned items and statistics
+ */
 export const handleCleanState: ToolHandler<CleanStateArgs> = async (args) => {
   logger.info('=== handleCleanState called ===', { args });
   
   try {
     const validated = CleanStateSchema.parse(args);
     
-    const stats = {
+    const stats: CleanupStats = {
       tasks: {
         total: 0,
         removed: 0,
@@ -39,86 +63,25 @@ export const handleCleanState: ToolHandler<CleanStateArgs> = async (args) => {
       }
     };
     
-    const removedItems: any[] = [];
-    const keptItems: any[] = [];
+    const removedItems: CleanupItem[] = [];
+    const keptItems: CleanupItem[] = [];
     
-    // Clean tasks
     if (validated.clean_tasks) {
-      const taskStore = TaskStore.getInstance();
-      const tasks = await taskStore.getTasks();
-      stats.tasks.total = tasks.length;
-      
-      const now = new Date();
-      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      
-      for (const task of tasks) {
-        const shouldRemove = validated.force || (
-          ['completed', 'failed', 'cancelled'].includes(task.status) &&
-          (!validated.keep_recent || new Date(task.updated_at) < oneDayAgo)
-        );
-        
-        if (shouldRemove) {
-          if (!validated.dry_run) {
-            await taskStore.deleteTask(task.id);
-          }
-          stats.tasks.removed++;
-          removedItems.push({
-            type: 'task',
-            id: task.id,
-            title: task.title,
-            status: task.status,
-            branch: task.branch,
-            updated_at: task.updated_at
-          });
-        } else {
-          stats.tasks.kept++;
-          keptItems.push({
-            type: 'task',
-            id: task.id,
-            title: task.title,
-            status: task.status,
-            branch: task.branch
-          });
-        }
-      }
+      await cleanupTasks({
+        validated,
+        stats,
+        removedItems,
+        keptItems
+      });
     }
     
-    // Clean sessions
     if (validated.clean_sessions) {
-      const claudeService = ClaudeCodeService.getInstance();
-      const claudeSessions = claudeService.getAllSessions();
-      stats.sessions.total = claudeSessions.length;
-      
-      const now = new Date();
-      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      
-      for (const session of claudeSessions) {
-        const shouldTerminate = validated.force || (
-          ['error', 'terminated'].includes(session.status) ||
-          (session.status === 'ready' && session.lastActivity < oneDayAgo)
-        );
-        
-        if (shouldTerminate) {
-          if (!validated.dry_run) {
-            await claudeService.endSession(session.id);
-          }
-          stats.sessions.terminated++;
-          removedItems.push({
-            type: 'session',
-            id: session.id,
-            status: session.status,
-            workingDirectory: session.workingDirectory,
-            lastActivity: session.lastActivity
-          });
-        } else {
-          stats.sessions.kept++;
-          keptItems.push({
-            type: 'session',
-            id: session.id,
-            status: session.status
-          });
-        }
-      }
+      await cleanupSessions({
+        validated,
+        stats,
+        removedItems,
+        keptItems
+      });
     }
     
     const message = validated.dry_run 
@@ -173,3 +136,98 @@ export const handleCleanState: ToolHandler<CleanStateArgs> = async (args) => {
     });
   }
 };
+
+/**
+ * Cleans up tasks based on status and age
+ */
+async function cleanupTasks(params: {
+  validated: CleanStateArgs;
+  stats: CleanupStats;
+  removedItems: CleanupItem[];
+  keptItems: CleanupItem[];
+}): Promise<void> {
+  const { validated, stats, removedItems, keptItems } = params;
+  const taskStore = TaskStore.getInstance();
+  const tasks = await taskStore.getTasks();
+  stats.tasks.total = tasks.length;
+  
+  const now = new Date();
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  
+  for (const task of tasks) {
+    const shouldRemove = validated.force || (
+      ['completed', 'failed', 'cancelled'].includes(task.status) &&
+      (!validated.keep_recent || new Date(task.updated_at) < oneDayAgo)
+    );
+    
+    if (shouldRemove) {
+      if (!validated.dry_run) {
+        await taskStore.deleteTask(task.id);
+      }
+      stats.tasks.removed++;
+      removedItems.push({
+        type: 'task',
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        branch: task.branch,
+        updated_at: task.updated_at
+      });
+    } else {
+      stats.tasks.kept++;
+      keptItems.push({
+        type: 'task',
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        branch: task.branch
+      });
+    }
+  }
+}
+
+/**
+ * Cleans up Claude Code sessions based on status and activity
+ */
+async function cleanupSessions(params: {
+  validated: CleanStateArgs;
+  stats: CleanupStats;
+  removedItems: CleanupItem[];
+  keptItems: CleanupItem[];
+}): Promise<void> {
+  const { validated, stats, removedItems, keptItems } = params;
+  const claudeService = ClaudeCodeService.getInstance();
+  const claudeSessions = claudeService.getAllSessions();
+  stats.sessions.total = claudeSessions.length;
+  
+  const now = new Date();
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  
+  for (const session of claudeSessions) {
+    const shouldTerminate = validated.force || (
+      ['error', 'terminated'].includes(session.status) ||
+      (session.status === 'ready' && session.lastActivity < oneDayAgo)
+    );
+    
+    if (shouldTerminate) {
+      if (!validated.dry_run) {
+        await claudeService.endSession(session.id);
+      }
+      stats.sessions.terminated++;
+      removedItems.push({
+        type: 'session',
+        id: session.id,
+        status: session.status,
+        workingDirectory: session.workingDirectory,
+        lastActivity: session.lastActivity instanceof Date ? session.lastActivity.toISOString() : session.lastActivity
+      });
+    } else {
+      stats.sessions.kept++;
+      keptItems.push({
+        type: 'session',
+        id: session.id,
+        status: session.status
+      });
+    }
+  }
+}

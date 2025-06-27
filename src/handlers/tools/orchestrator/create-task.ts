@@ -7,6 +7,7 @@ import { AgentManager } from "../../../services/agent-manager.js";
 import { ClaudeCodeOptions, ClaudeCodeService } from "../../../services/claude-code-service.js";
 import { GeminiOptions } from "../../../services/gemini-cli-service.js";
 import { logger } from "../../../utils/logger.js";
+import { execSync } from 'child_process';
 
 const CreateTaskSchema = z.object({
   title: z.string(),
@@ -17,185 +18,122 @@ const CreateTaskSchema = z.object({
 
 type CreateTaskArgs = z.infer<typeof CreateTaskSchema>;
 
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  requirements: string[];
+  priority: "low" | "medium" | "high";
+  estimated_complexity: "simple" | "moderate" | "complex";
+  preferred_agent: "claude" | "gemini";
+  project_path: string;
+  branch: string;
+  dependencies: string[];
+  status: "pending" | "in_progress" | "completed" | "failed" | "cancelled";
+  created_at: string;
+  updated_at: string;
+  assigned_to: string | null;
+  progress: number;
+  logs: string[];
+}
+
+/**
+ * Creates a new task and optionally starts an AI session to execute it
+ * @param args - Task creation parameters
+ * @param context - Execution context containing session information
+ * @returns Formatted response with task details and session information
+ */
 export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args, context) => {
   try {
     const validated = CreateTaskSchema.parse(args);
     const taskStore = TaskStore.getInstance();
     const agentManager = AgentManager.getInstance();
     
-    // Use the project path from environment or default root
     const resolvedProjectPath = process.env.PROJECT_ROOT || process.env.PROJECTS_PATH || '/var/www/html/systemprompt-coding-agent';
     logger.info(`Using project path: ${resolvedProjectPath}`);
     
-    // Extract session ID from context
     const sessionId = context?.sessionId;
     logger.info(`[CREATE_TASK] Session ID: ${sessionId || 'none'}`);
     
-    // Generate unique task ID
     const taskId = `task_${uuidv4()}`;
     
-    // Create task object
-    const task = {
+    const task: Task = {
       id: taskId,
       title: validated.title,
       description: validated.instructions,
       requirements: [],
-      priority: "medium" as const,
-      estimated_complexity: "moderate" as const,
-      preferred_agent: (validated.tool === "CLAUDECODE" ? "claude" : "gemini") as "claude" | "gemini",
+      priority: "medium",
+      estimated_complexity: "moderate",
+      preferred_agent: validated.tool === "CLAUDECODE" ? "claude" : "gemini",
       project_path: resolvedProjectPath,
       branch: validated.branch,
       dependencies: [],
-      status: "pending" as const,
+      status: "pending",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      assigned_to: null as string | null,
+      assigned_to: null,
       progress: 0,
       logs: [`Task created with ${validated.tool} tool`]
     };
     
-    // Store task with session ID for proper notification routing
     await taskStore.createTask(task, sessionId);
     
     let agentSessionId: string | null = null;
     let commandResult: any = null;
     
-    // Always start AI session immediately
     try {
         await taskStore.updateTask(taskId, { status: "in_progress" }, sessionId);
         
-        // Create the branch in the file system (if Git is available)
-        try {
-          const { execSync } = await import('child_process');
-          const projectPath = resolvedProjectPath;
-          
-          // Check if it's a git repository
-          try {
-            execSync('git rev-parse --git-dir', { 
-              cwd: projectPath, 
-              stdio: 'ignore' 
-            });
-            
-            // Create and checkout the branch
-            try {
-              execSync(`git checkout -b ${validated.branch}`, {
-                cwd: projectPath,
-                stdio: 'ignore'
-              });
-              await taskStore.addLog(taskId, `Created and switched to branch: ${validated.branch}`, sessionId);
-            } catch (e) {
-              // Branch might already exist, try to checkout
-              execSync(`git checkout ${validated.branch}`, {
-                cwd: projectPath,
-                stdio: 'ignore'
-              });
-              await taskStore.addLog(taskId, `Switched to existing branch: ${validated.branch}`, sessionId);
-            }
-          } catch (e) {
-            await taskStore.addLog(taskId, `Not a git repository, proceeding without branch: ${validated.branch}`, sessionId);
-          }
-        } catch (e) {
-          logger.warn(`Failed to create branch: ${e}`);
-          await taskStore.addLog(taskId, `Failed to create branch: ${e}`, sessionId);
-        }
+        await createGitBranch(resolvedProjectPath, validated.branch, taskId, sessionId, taskStore);
         
         if (validated.tool === "CLAUDECODE") {
-          // Start Claude session with user's project directory
-          const claudeOptions: ClaudeCodeOptions = {
-            workingDirectory: resolvedProjectPath
-          };
-          
-          agentSessionId = await agentManager.startClaudeSession({
-            project_path: resolvedProjectPath,
-            task_id: taskId,
-            options: claudeOptions
+          agentSessionId = await startClaudeSession({
+            agentManager,
+            taskStore,
+            resolvedProjectPath,
+            taskId,
+            sessionId
           });
-          
-          // Link the Claude session to the task for proper logging
           const claudeService = ClaudeCodeService.getInstance();
-          const agentSession = agentManager.getSession(agentSessionId);
-          if (agentSession?.serviceSessionId) {
-            claudeService.setTaskId(agentSession.serviceSessionId, taskId);
-            await taskStore.addLog(taskId, `[SESSION_LINKED] Claude session ${agentSession.serviceSessionId} linked to task`, sessionId);
-          }
-          
-          // Set up event listeners for task tracking
-          const progressHandler = async (data: any) => {
-            if (data.taskId === taskId) {
-              await taskStore.addLog(taskId, `[PROGRESS] ${data.event}: ${data.data}`, sessionId);
-              
-              // Update task status based on events
-              if (data.event === 'error:occurred') {
-                await taskStore.updateTask(taskId, { status: 'failed' }, sessionId);
-              }
-            }
-          };
-          
-          const streamHandler = async (data: any) => {
-            if (data.taskId === taskId) {
-              // Stream data is already comprehensively logged in parseProgressFromStream
-              // Just track activity for monitoring
-              const agentSession = agentSessionId ? agentManager.getSession(agentSessionId) : null;
-              if (agentSession) {
-                agentSession.last_activity = new Date().toISOString();
-              }
-            }
-          };
+          const { progressHandler, streamHandler } = setupClaudeEventHandlers({
+            taskId,
+            sessionId,
+            agentSessionId,
+            taskStore,
+            agentManager
+          });
           
           claudeService.on('task:progress', progressHandler);
           claudeService.on('stream:data', streamHandler);
           
-          // Send initial instructions directly (branch already created)
           try {
             if (validated.instructions) {
-              await taskStore.addLog(taskId, `[INSTRUCTIONS_SENDING] Sending initial instructions...`, sessionId);
-              
-              // The sendCommand promise resolves when Claude completes the task
-              const result = await agentManager.sendCommand(agentSessionId!, {
-                command: validated.instructions
+              commandResult = await executeClaudeInstructions({
+                agentManager,
+                taskStore,
+                agentSessionId: agentSessionId!,
+                taskId,
+                sessionId,
+                instructions: validated.instructions
               });
-              
-              commandResult = result;
-              await taskStore.addLog(taskId, `[INSTRUCTIONS_COMPLETED] Claude has finished processing the instructions`, sessionId);
-              await taskStore.updateTask(taskId, { status: 'completed' });
-              await taskStore.addLog(taskId, `[TASK_COMPLETED] Task completed successfully`, sessionId);
-              
-              // Clean up event listeners
-              claudeService.off('task:progress', progressHandler);
-              claudeService.off('stream:data', streamHandler);
             }
-          } catch (cmdError) {
-            logger.error('Failed to send instructions to Claude Code', cmdError);
-            await taskStore.addLog(taskId, `[ERROR] Instructions error: ${cmdError}`, sessionId);
-            await taskStore.updateTask(taskId, { status: 'failed' });
-            
-            // Clean up event listeners
+          } finally {
             claudeService.off('task:progress', progressHandler);
             claudeService.off('stream:data', streamHandler);
           }
           
         } else if (validated.tool === "GEMINICLI") {
-          // Start Gemini session
-          const geminiOptions: GeminiOptions = {};
-          
-          agentSessionId = await agentManager.startGeminiSession({
-            project_path: resolvedProjectPath,
-            task_id: taskId,
-            options: geminiOptions
+          const geminiResult = await executeGeminiTask({
+            agentManager,
+            resolvedProjectPath,
+            taskId,
+            instructions: validated.instructions
           });
-          
-          // Send initial instructions
-          if (validated.instructions) {
-            const result = await agentManager.sendCommand(agentSessionId, {
-              command: validated.instructions
-            });
-            commandResult = result;
-          }
+          agentSessionId = geminiResult.sessionId;
+          commandResult = geminiResult.commandResult;
         }
         
-        // Update task with session assignment
         if (agentSessionId) {
-          task.assigned_to = agentSessionId;
           await taskStore.updateTask(taskId, { 
             assigned_to: agentSessionId,
             logs: [`Session ${agentSessionId} started with ${validated.tool}`]
@@ -245,3 +183,170 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args, contex
     });
   }
 };
+
+/**
+ * Creates and checks out a Git branch for the task
+ */
+async function createGitBranch(
+  projectPath: string,
+  branchName: string,
+  taskId: string,
+  sessionId: string | undefined,
+  taskStore: TaskStore
+): Promise<void> {
+  try {
+    try {
+      execSync('git rev-parse --git-dir', { 
+        cwd: projectPath, 
+        stdio: 'ignore' 
+      });
+      
+      try {
+        execSync(`git checkout -b ${branchName}`, {
+          cwd: projectPath,
+          stdio: 'ignore'
+        });
+        await taskStore.addLog(taskId, `Created and switched to branch: ${branchName}`, sessionId);
+      } catch (e) {
+        execSync(`git checkout ${branchName}`, {
+          cwd: projectPath,
+          stdio: 'ignore'
+        });
+        await taskStore.addLog(taskId, `Switched to existing branch: ${branchName}`, sessionId);
+      }
+    } catch (e) {
+      await taskStore.addLog(taskId, `Not a git repository, proceeding without branch: ${branchName}`, sessionId);
+    }
+  } catch (e) {
+    logger.warn(`Failed to create branch: ${e}`);
+    await taskStore.addLog(taskId, `Failed to create branch: ${e}`, sessionId);
+  }
+}
+
+/**
+ * Starts a Claude Code session for the task
+ */
+async function startClaudeSession(params: {
+  agentManager: AgentManager;
+  taskStore: TaskStore;
+  resolvedProjectPath: string;
+  taskId: string;
+  sessionId: string | undefined;
+}): Promise<string> {
+  const { agentManager, taskStore, resolvedProjectPath, taskId, sessionId } = params;
+  
+  const claudeOptions: ClaudeCodeOptions = {
+    workingDirectory: resolvedProjectPath
+  };
+  
+  const agentSessionId = await agentManager.startClaudeSession({
+    project_path: resolvedProjectPath,
+    task_id: taskId,
+    options: claudeOptions
+  });
+  
+  const claudeService = ClaudeCodeService.getInstance();
+  const agentSession = agentManager.getSession(agentSessionId);
+  if (agentSession?.serviceSessionId) {
+    claudeService.setTaskId(agentSession.serviceSessionId, taskId);
+    await taskStore.addLog(taskId, `[SESSION_LINKED] Claude session ${agentSession.serviceSessionId} linked to task`, sessionId);
+  }
+  
+  return agentSessionId;
+}
+
+/**
+ * Sets up event handlers for Claude Code progress tracking
+ */
+function setupClaudeEventHandlers(params: {
+  taskId: string;
+  sessionId: string | undefined;
+  agentSessionId: string | null;
+  taskStore: TaskStore;
+  agentManager: AgentManager;
+}) {
+  const { taskId, sessionId, agentSessionId, taskStore, agentManager } = params;
+  
+  const progressHandler = async (data: any) => {
+    if (data.taskId === taskId) {
+      await taskStore.addLog(taskId, `[PROGRESS] ${data.event}: ${data.data}`, sessionId);
+      
+      if (data.event === 'error:occurred') {
+        await taskStore.updateTask(taskId, { status: 'failed' }, sessionId);
+      }
+    }
+  };
+  
+  const streamHandler = async (data: any) => {
+    if (data.taskId === taskId) {
+      const agentSession = agentSessionId ? agentManager.getSession(agentSessionId) : null;
+      if (agentSession) {
+        agentSession.last_activity = new Date().toISOString();
+      }
+    }
+  };
+  
+  return { progressHandler, streamHandler };
+}
+
+/**
+ * Executes Claude Code instructions and updates task status
+ */
+async function executeClaudeInstructions(params: {
+  agentManager: AgentManager;
+  taskStore: TaskStore;
+  agentSessionId: string;
+  taskId: string;
+  sessionId: string | undefined;
+  instructions: string;
+}): Promise<any> {
+  const { agentManager, taskStore, agentSessionId, taskId, sessionId, instructions } = params;
+  
+  try {
+    await taskStore.addLog(taskId, `[INSTRUCTIONS_SENDING] Sending initial instructions...`, sessionId);
+    
+    const result = await agentManager.sendCommand(agentSessionId, {
+      command: instructions
+    });
+    
+    await taskStore.addLog(taskId, `[INSTRUCTIONS_COMPLETED] Claude has finished processing the instructions`, sessionId);
+    await taskStore.updateTask(taskId, { status: 'completed' }, sessionId);
+    await taskStore.addLog(taskId, `[TASK_COMPLETED] Task completed successfully`, sessionId);
+    
+    return result;
+  } catch (cmdError) {
+    logger.error('Failed to send instructions to Claude Code', cmdError);
+    await taskStore.addLog(taskId, `[ERROR] Instructions error: ${cmdError}`, sessionId);
+    await taskStore.updateTask(taskId, { status: 'failed' }, sessionId);
+    throw cmdError;
+  }
+}
+
+/**
+ * Executes a Gemini CLI task
+ */
+async function executeGeminiTask(params: {
+  agentManager: AgentManager;
+  resolvedProjectPath: string;
+  taskId: string;
+  instructions: string | undefined;
+}): Promise<{ sessionId: string; commandResult: any }> {
+  const { agentManager, resolvedProjectPath, taskId, instructions } = params;
+  
+  const geminiOptions: GeminiOptions = {};
+  
+  const sessionId = await agentManager.startGeminiSession({
+    project_path: resolvedProjectPath,
+    task_id: taskId,
+    options: geminiOptions
+  });
+  
+  let commandResult = null;
+  if (instructions) {
+    commandResult = await agentManager.sendCommand(sessionId, {
+      command: instructions
+    });
+  }
+  
+  return { sessionId, commandResult };
+}

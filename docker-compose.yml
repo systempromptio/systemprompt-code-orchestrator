@@ -15,6 +15,7 @@ services:
       - STATE_PATH=/data/state
       - PROJECTS_PATH=/data/projects
       - FILE_ROOT=/workspace
+      - PROJECT_ROOT=/workspace
       # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}  # Commented out - using authenticated user session
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     env_file:

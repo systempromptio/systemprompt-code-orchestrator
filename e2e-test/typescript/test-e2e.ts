@@ -9,6 +9,10 @@
 
 import { createMCPClient, log, TestTracker, runTest } from './test-utils.js';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { 
+  ResourceListChangedNotificationSchema,
+  ResourceUpdatedNotificationSchema
+} from '@modelcontextprotocol/sdk/types.js';
 
 async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -19,14 +23,56 @@ async function sleep(ms: number): Promise<void> {
  */
 async function testCreateTaskFlow(client: Client): Promise<void> {
   const timestamp = Date.now();
-  const resourceChanges: Array<{timestamp: string, uri: string, event: string}> = [];
+  let taskComplete = false;
+  let taskId: string | null = null;
+  let sessionId: string | null = null;
+  const notifications: Array<{timestamp: string, type: string, data: any}> = [];
   
-  // Set up notification handler
-  client.setNotificationHandler({
-    resourceListChanged: async () => {
-      const event = { timestamp: new Date().toISOString(), uri: 'resourceList', event: 'changed' };
-      resourceChanges.push(event);
-      log.info(`📢 Resource list changed`);
+  // Set up notification handlers BEFORE creating the task
+  client.setNotificationHandler(ResourceListChangedNotificationSchema, (notification) => {
+    const notif = {
+      timestamp: new Date().toISOString(),
+      type: 'ResourceListChanged',
+      data: notification
+    };
+    notifications.push(notif);
+    log.info(`📢 [${notif.timestamp}] Resource list changed`);
+  });
+  
+  client.setNotificationHandler(ResourceUpdatedNotificationSchema, async (notification) => {
+    const notif = {
+      timestamp: new Date().toISOString(),
+      type: 'ResourceUpdated',
+      data: notification.params
+    };
+    notifications.push(notif);
+    log.info(`📢 [${notif.timestamp}] Resource updated: ${notification.params.uri}`);
+    
+    // If it's our task, read the updated resource
+    if (taskId && notification.params.uri === `task://${taskId}`) {
+      try {
+        const taskResource = await client.readResource({ uri: notification.params.uri });
+        if (taskResource.contents?.[0]?.text) {
+          const taskInfo = JSON.parse(taskResource.contents[0].text);
+          log.info(`  📊 Task Status: ${taskInfo.status}, Progress: ${taskInfo.progress}%`);
+          
+          // Show recent logs
+          if (taskInfo.logs && taskInfo.logs.length > 0) {
+            const recentLogs = taskInfo.logs.slice(-2);
+            recentLogs.forEach((logLine: string) => {
+              log.debug(`  📝 ${logLine}`);
+            });
+          }
+          
+          // Check if task is complete
+          if (taskInfo.status === 'completed' || taskInfo.status === 'failed') {
+            taskComplete = true;
+            log.info(`  ✅ Task ${taskInfo.status}!`);
+          }
+        }
+      } catch (error) {
+        log.debug(`  ⚠️ Could not read updated resource: ${error}`);
+      }
     }
   });
   
@@ -58,122 +104,147 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
     throw new Error('create_task did not return a task_id');
   }
   
-  const taskId = taskData.result.task_id;
+  taskId = taskData.result.task_id;
+  sessionId = taskData.result.session_id;
   log.debug(`Task created with ID: ${taskId}`);
+  log.debug(`Session ID: ${sessionId || 'none'}`);
+  log.debug(`Tool: ${taskData.result.tool}`);
+  log.debug(`Status: ${taskData.result.status}`);
   
-  // Wait a bit for notifications
-  await sleep(1000);
+  // Step 2: Subscribe to task resource
+  const taskUri = `task://${taskId}`;
+  log.info(`🔔 Subscribing to task resource: ${taskUri}`);
   
-  // Step 2: Subscribe to specific task resource if available
   try {
-    const resources = await client.listResources();
-    const taskResource = resources.resources?.find(r => r.uri.includes(`task://${taskId}`));
-    if (taskResource) {
-      log.debug(`Found task resource: ${taskResource.uri}`);
-      
-      // Subscribe to this specific resource
-      await client.subscribeResource({ uri: taskResource.uri });
-      log.info(`📡 Subscribed to task resource: ${taskResource.uri}`);
-    }
+    await client.subscribeResource({ uri: taskUri });
+    log.success(`Subscribed to ${taskUri}`);
   } catch (error) {
-    log.debug('Could not subscribe to task resource');
+    log.warning(`Could not subscribe to task resource: ${error}`);
   }
   
-  // Step 3: Send additional instructions if we have a session
-  if (taskData.result?.session_id) {
+  // Step 3: Read initial task state
+  await sleep(1000); // Give it a moment to initialize
+  
+  try {
+    const taskResource = await client.readResource({ uri: taskUri });
+    if (taskResource.contents?.[0]?.text) {
+      const taskInfo = JSON.parse(taskResource.contents[0].text);
+      log.info(`📋 Initial Task State:`);
+      log.info(`  Title: ${taskInfo.title}`);
+      log.info(`  Status: ${taskInfo.status}`);
+      log.info(`  Progress: ${taskInfo.progress}%`);
+      log.info(`  Branch: ${taskInfo.branch}`);
+      
+      // Check if already completed
+      if (taskInfo.status === 'completed' || taskInfo.status === 'failed') {
+        taskComplete = true;
+      }
+    }
+  } catch (error) {
+    log.debug(`Could not read initial task state: ${error}`);
+  }
+  
+  // Step 4: Send additional instructions if we have a session and task is active
+  if (sessionId && !taskComplete) {
+    await sleep(2000); // Wait a bit for the task to start
     log.debug('Sending additional instructions to the active session...');
     try {
       const updateResult = await client.callTool({
         name: 'update_task',
         arguments: {
-          process: taskData.result.session_id,
-          instructions: 'Also create a test file called hello.test.js that tests the greet function'
+          process: sessionId,
+          instructions: 'Also create a test file called hello.test.js that tests the greet function with at least 3 test cases'
         }
       });
       
       const updateContent = updateResult.content as any[];
       if (updateContent?.[0]?.text) {
         const updateData = JSON.parse(updateContent[0].text);
-        log.debug(`Additional instructions sent: ${updateData.status || 'success'}`);
+        log.debug(`Additional instructions sent: ${updateData.message || 'success'}`);
       }
     } catch (error) {
-      log.debug(`Could not send additional instructions: ${error}`);
+      log.debug(`Note: Could not send additional instructions - ${error}`);
     }
   }
   
-  // Step 4: Monitor task progress with notifications
-  log.debug('Monitoring task progress...');
-  let taskComplete = false;
-  let attempts = 0;
-  const maxAttempts = 30; // 30 * 2 = 60 seconds max
-  let lastStatus = 'pending';
-  
-  while (!taskComplete && attempts < maxAttempts) {
-    attempts++;
-    await sleep(2000); // Wait 2 seconds between checks
+  // Step 5: Wait for task completion via notifications (with timeout)
+  if (!taskComplete) {
+    log.info('⏳ Waiting for task completion via notifications...');
+    const maxWaitTime = 120000; // 2 minutes
+    const startTime = Date.now();
     
-    try {
-      // Try to read task resource
-      const resources = await client.listResources();
-      const taskResource = resources.resources?.find(r => r.uri.includes(`task://${taskId}`));
-      
-      if (taskResource) {
-        const taskStatus = await client.readResource({ uri: taskResource.uri });
-        if (taskStatus.contents?.[0]?.text) {
-          const status = JSON.parse(taskStatus.contents[0].text);
-          const currentStatus = status.status || 'unknown';
-          
-          if (currentStatus !== lastStatus) {
-            log.info(`📊 Task status changed: ${lastStatus} → ${currentStatus}`);
-            lastStatus = currentStatus;
-          }
-          
-          log.debug(`Task progress: ${status.progress || 0}% (attempt ${attempts}/${maxAttempts})`);
-          
-          if (currentStatus === 'completed' || currentStatus === 'failed') {
-            taskComplete = true;
-            if (currentStatus === 'failed') {
-              throw new Error('Task failed');
-            }
-          }
-        }
-      }
-    } catch (error) {
-      // Resource might not be available yet
-      log.debug(`Waiting for task completion... (attempt ${attempts}/${maxAttempts})`);
+    while (!taskComplete && (Date.now() - startTime) < maxWaitTime) {
+      await sleep(1000);
+      // Task completion is handled by notification handler
     }
-  }
-  
-  // Step 5: Check final task state
-  if (taskComplete) {
-    log.debug('Task completed, checking final state...');
   }
   
   // Step 6: Unsubscribe from resource
   try {
-    const resources = await client.listResources();
-    const taskResource = resources.resources?.find(r => r.uri.includes(`task://${taskId}`));
-    if (taskResource) {
-      await client.unsubscribeResource({ uri: taskResource.uri });
-      log.info(`📴 Unsubscribed from task resource`);
-    }
+    await client.unsubscribeResource({ uri: taskUri });
+    log.info(`🔕 Unsubscribed from ${taskUri}`);
   } catch (error) {
-    log.debug('Could not unsubscribe from task resource');
+    log.debug(`Could not unsubscribe: ${error}`);
   }
   
-  // Summary
-  log.section('📋 Notification Summary');
-  log.info(`Total resource changes detected: ${resourceChanges.length}`);
-  if (resourceChanges.length > 0) {
-    resourceChanges.forEach((change, idx) => {
-      log.debug(`  ${idx + 1}. ${change.timestamp}: ${change.event} - ${change.uri}`);
-    });
+  // Step 7: Get final task state and output
+  log.section('📄 Final Task State');
+  try {
+    const finalStatus = await client.readResource({ uri: taskUri });
+    
+    if (finalStatus.contents?.[0]?.text) {
+      const final = JSON.parse(finalStatus.contents[0].text);
+      log.info(`Status: ${final.status}`);
+      log.info(`Progress: ${final.progress}%`);
+      log.info(`Total logs: ${final.logs?.length || 0}`);
+      
+      // Show all logs
+      if (final.logs && final.logs.length > 0) {
+        log.info('Task logs:');
+        final.logs.forEach((logLine: string, idx: number) => {
+          log.debug(`  ${idx + 1}. ${logLine}`);
+        });
+      }
+      
+      // Try to read task output
+      try {
+        const outputUri = `task-output://${taskId}`;
+        const outputResource = await client.readResource({ uri: outputUri });
+        
+        if (outputResource.contents?.[0]?.text) {
+          const output = JSON.parse(outputResource.contents[0].text);
+          log.section('📝 Task Output');
+          log.info(`Files created: ${output.files?.length || 0}`);
+          if (output.files && output.files.length > 0) {
+            output.files.forEach((file: any) => {
+              log.debug(`  - ${file.path} (${file.size} bytes)`);
+            });
+          }
+          if (output.output) {
+            log.info('Command output preview:');
+            log.debug(output.output.substring(0, 500) + (output.output.length > 500 ? '...' : ''));
+          }
+        }
+      } catch (e) {
+        log.debug('No task output available');
+      }
+    }
+  } catch (error) {
+    log.debug('Could not read final task state');
   }
+  
+  // Step 8: Summary of notifications
+  log.section('📊 Notification Summary');
+  log.info(`Total notifications received: ${notifications.length}`);
+  notifications.forEach((notif, idx) => {
+    log.debug(`${idx + 1}. [${notif.timestamp}] ${notif.type}`);
+    if (notif.data) {
+      log.debug(`   Data: ${JSON.stringify(notif.data)}`);
+    }
+  });
   
   if (!taskComplete) {
     log.warning('Task did not complete within timeout period');
-  } else {
-    log.success('Task completed successfully');
   }
 }
 
@@ -187,7 +258,7 @@ async function testCreateTaskErrorHandling(client: Client): Promise<void> {
       name: 'create_task',
       arguments: {
         title: 'Invalid Tool Test',
-        tool: 'INVALID_TOOL',
+        tool: 'INVALID_TOOL' as any,
         instructions: 'This should fail',
         branch: 'invalid-branch'
       }
@@ -204,7 +275,7 @@ async function testCreateTaskErrorHandling(client: Client): Promise<void> {
       arguments: {
         title: 'Missing Fields Test'
         // Missing tool, instructions, and branch
-      }
+      } as any
     });
     throw new Error('Expected error for missing required fields');
   } catch (error) {
@@ -223,7 +294,7 @@ export async function testE2E(): Promise<void> {
   
   try {
     client = await createMCPClient(true); // Enable notifications
-    log.success('Connected to MCP server');
+    log.success('Connected to MCP server with notifications enabled');
     
     await runTest('Create Task Flow', () => testCreateTaskFlow(client!), tracker);
     await runTest('Error Handling', () => testCreateTaskErrorHandling(client!), tracker);

@@ -10,12 +10,16 @@ const UpdateTaskSchema = z.object({
 
 type UpdateTaskArgs = z.infer<typeof UpdateTaskSchema>;
 
+/**
+ * Sends new instructions to an active AI agent session
+ * @param args - Process ID and instructions to send
+ * @returns Result of the command execution
+ */
 export const handleUpdateTask: ToolHandler<UpdateTaskArgs> = async (args) => {
   try {
     const validated = UpdateTaskSchema.parse(args);
     const agentManager = AgentManager.getInstance();
     
-    // Get the session by process ID
     const session = agentManager.getSession(validated.process);
     if (!session) {
       return formatToolResponse({
@@ -25,7 +29,6 @@ export const handleUpdateTask: ToolHandler<UpdateTaskArgs> = async (args) => {
       });
     }
     
-    // Check if session is active
     if (session.status !== 'active') {
       return formatToolResponse({
         status: "error",
@@ -34,7 +37,6 @@ export const handleUpdateTask: ToolHandler<UpdateTaskArgs> = async (args) => {
       });
     }
     
-    // Send instructions to the AI agent
     const result = await agentManager.sendCommand(validated.process, {
       command: validated.instructions
     });

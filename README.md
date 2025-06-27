@@ -128,11 +128,25 @@ Add the server to your MCP client configuration:
 }
 ```
 
+## Tools Overview
+
+The SystemPrompt MCP Server provides 7 core tools for managing AI coding tasks:
+
+| Tool | Purpose | When to Use |
+|------|---------|-------------|
+| `create_task` | Start a new AI coding session | Beginning any coding task |
+| `update_task` | Send additional instructions | Adding requirements mid-task |
+| `end_task` | Complete and clean up a task | Task is done or needs to stop |
+| `report_task` | Generate task reports | Review progress or outcomes |
+| `check_status` | Verify system readiness | Before starting tasks |
+| `update_stats` | Get system statistics | Monitoring active work |
+| `clean_state` | Clean up old tasks/sessions | Maintenance and cleanup |
+
 ## Core Tools
 
 ### 1. create_task
 
-Creates a new coding task and immediately starts the AI agent.
+Creates a new coding task and immediately starts the AI agent to work on it.
 
 ```typescript
 {
@@ -144,51 +158,125 @@ Creates a new coding task and immediately starts the AI agent.
 ```
 
 **Parameters:**
-- `title`: Short, descriptive title for the task
-- `tool`: Which AI tool to use (`"CLAUDECODE"` or `"GEMINICLI"`)
-- `instructions`: Detailed instructions for what needs to be done
-- `branch`: Git branch name (will be created if it doesn't exist)
+- `title` (required): Short, descriptive title for the task
+- `tool` (required): Which AI tool to use (`"CLAUDECODE"` or `"GEMINICLI"`)
+- `instructions` (required): Detailed instructions for what needs to be done
+- `branch` (required): Git branch name (will be created if it doesn't exist)
+
+**Returns:** Task ID, session ID, and initial status
 
 ### 2. update_task
 
-Send additional commands or instructions to an active task.
+Send additional instructions to an active AI process.
 
 ```typescript
 {
-  "task_id": "task_abc123",
-  "command": "Add password reset functionality",
-  "status": "in_progress"  // optional
+  "process": "session_abc123",
+  "instructions": "Add password reset functionality"
 }
 ```
+
+**Parameters:**
+- `process` (required): The process ID (session ID) of the active AI agent
+- `instructions` (required): New instructions to send to the AI agent
 
 ### 3. end_task
 
-Complete a task and save all logs and artifacts.
+End a task, optionally sending a final command, and clean up the AI session.
 
 ```typescript
 {
   "task_id": "task_abc123",
-  "reason": "Task completed successfully"
+  "status": "completed",  // or "failed", "cancelled"
+  "summary": "Successfully implemented authentication",
+  "final_command": "npm test",
+  "generate_report": true,
+  "cleanup": {
+    "save_session_logs": true,
+    "save_code_changes": true,
+    "compress_context": false
+  }
 }
 ```
 
-### 4. check_task_status
+**Parameters:**
+- `task_id` (required): The ID of the task to end
+- `status` (required): Final status (`"completed"`, `"failed"`, or `"cancelled"`)
+- `final_command` (optional): Command to run before ending
+- `summary` (optional): Summary of what was accomplished
+- `result` (optional): Any final result data to store
+- `generate_report` (optional, default: true): Generate a final report
+- `cleanup` (optional): Cleanup options for logs and context
 
-Get the current status of a specific task.
+### 4. report_task
+
+Generate reports on task progress and outcomes.
 
 ```typescript
 {
-  "task_id": "task_abc123"
+  "task_ids": ["task_abc123", "task_def456"],  // empty for all tasks
+  "report_type": "detailed",  // "summary", "detailed", or "progress"
+  "format": "markdown"  // or "json"
 }
 ```
 
-### 5. update_stats
+**Parameters:**
+- `task_ids` (optional): List of specific task IDs (empty for all tasks)
+- `report_type` (optional, default: "summary"): Level of detail
+- `format` (optional, default: "json"): Output format
 
-Get overall statistics about tasks and sessions.
+### 5. check_status
+
+Check the status of Claude Code SDK and Gemini CLI availability.
 
 ```typescript
-{} // No parameters required
+{
+  "test_sessions": true,
+  "verbose": false
+}
 ```
+
+**Parameters:**
+- `test_sessions` (optional, default: true): Test creating sessions
+- `verbose` (optional, default: false): Include detailed diagnostics
+
+**Returns:** Service availability, API key status, and system configuration
+
+### 6. update_stats
+
+Get current statistics on tasks and active sessions.
+
+```typescript
+{
+  "include_tasks": true,
+  "include_sessions": true
+}
+```
+
+**Parameters:**
+- `include_tasks` (optional, default: true): Include task statistics
+- `include_sessions` (optional, default: true): Include session statistics
+
+### 7. clean_state
+
+Clean up system state by removing completed tasks and inactive sessions.
+
+```typescript
+{
+  "clean_tasks": true,
+  "clean_sessions": true,
+  "keep_recent": true,
+  "force": false,
+  "dry_run": false
+}
+```
+
+**Parameters:**
+- `clean_tasks` (optional, default: true): Remove completed/failed tasks
+- `clean_sessions` (optional, default: true): Terminate inactive sessions
+- `keep_recent` (optional, default: true): Keep items from last 24 hours
+- `force` (optional, default: false): Clean everything regardless of status
+- `dry_run` (optional, default: false): Preview what would be cleaned
 
 ## Usage Examples
 
@@ -251,8 +339,50 @@ const response = await mcp.call('create_task', {
 
 // Later, add more context if needed
 await mcp.call('update_task', {
-  task_id: response.task_id,
-  command: 'Also check if the reset token is being properly invalidated'
+  process: response.result.session_id,
+  instructions: 'Also check if the reset token is being properly invalidated'
+});
+```
+
+### Example 4: Task Management
+
+```javascript
+// Check system status first
+const status = await mcp.call('check_status', {
+  verbose: true
+});
+
+// Get statistics on all tasks
+const stats = await mcp.call('update_stats', {
+  include_tasks: true,
+  include_sessions: true
+});
+
+// Generate a detailed report for specific tasks
+const report = await mcp.call('report_task', {
+  task_ids: ['task_abc123', 'task_def456'],
+  report_type: 'detailed',
+  format: 'markdown'
+});
+
+// Clean up old completed tasks
+const cleanup = await mcp.call('clean_state', {
+  clean_tasks: true,
+  clean_sessions: true,
+  keep_recent: true,
+  dry_run: true  // Preview first
+});
+
+// End a task with final testing
+const result = await mcp.call('end_task', {
+  task_id: 'task_abc123',
+  status: 'completed',
+  final_command: 'npm test',
+  summary: 'Successfully implemented user authentication with JWT',
+  cleanup: {
+    save_session_logs: true,
+    save_code_changes: true
+  }
 });
 ```
 
