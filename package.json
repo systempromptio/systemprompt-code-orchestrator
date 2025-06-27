@@ -1,7 +1,7 @@
 {
   "name": "@systemprompt/systemprompt-mcp-server",
   "version": "1.0.1",
-  "description": "Complete example MCP server implementation with full specification support, type safety, and production-ready architecture. Demonstrates OAuth 2.1, tools, prompts, sampling, and notifications using Reddit as a real-world integration.",
+  "description": "Coding Agent MCP server for orchestrating Claude Code CLI and Gemini CLI sessions to perform coding tasks.",
   "type": "module",
   "exports": {
     ".": {
@@ -23,7 +23,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "tsc && tsc-alias && chmod +x build/index.js && echo \"export * from './config.js';\nexport * from './oauth.js';\nexport * from './mcp.js';\nexport * from './auth-store.js';\nexport * from './types.js';\" > build/server/index.js",
+    "build": "tsc && tsc-alias && chmod +x build/index.js && echo \"export * from './config.js';\nexport * from './mcp.js';\" > build/server/index.js",
     "watch": "tsc --watch",
     "docker": "docker-compose build && docker-compose up -d",
     "test": "cd e2e-test && npm test",
@@ -36,13 +36,16 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.13.0",
+    "@anthropic-ai/claude-code": "^1.0.35",
+    "@google/gemini-cli": "latest",
     "ajv-formats": "^3.0.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "jose": "^6.0.11",
-    "zod": "^3.25.67"
+    "zod": "^3.25.67",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.9",
@@ -50,6 +53,7 @@
     "@types/express": "^5.0.3",
     "@types/json-schema": "^7.0.15",
     "@types/node": "^22.15.32",
+    "@types/uuid": "^9.0.7",
     "@typescript-eslint/eslint-plugin": "^8.34.1",
     "@typescript-eslint/parser": "^8.34.1",
     "eslint": "^9.29.0",
@@ -68,8 +72,10 @@
     "mcp-example",
     "typescript",
     "type-safe",
-    "oauth2",
-    "reddit",
+    "coding-agent",
+    "claude-code",
+    "gemini-cli",
+    "orchestrator",
     "example",
     "template",
     "boilerplate"

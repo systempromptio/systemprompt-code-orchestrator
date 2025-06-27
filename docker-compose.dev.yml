@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - STATE_PATH=/data/state
+      - PROJECTS_PATH=/data/projects
+    env_file:
+      - .env
+    volumes:
+      # Persistent state storage (local directory for development)
+      - ./data/state:/data/state
+      # Projects directory for code execution
+      - ${PROJECTS_PATH:-./data/projects}:/data/projects
+      # Docker socket for container management (optional)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    # Run as current user in development
+    user: "${UID:-1000}:${GID:-1000}"

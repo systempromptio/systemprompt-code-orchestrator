@@ -65,3 +65,10 @@ Thumbs.db
 # Docker
 docker-compose.override.yml
 .dockerignore.local
+
+# Data directories (state persistence)
+data/
+coding-agent-state/
+*.db
+*.sqlite
+projects/test-repo/

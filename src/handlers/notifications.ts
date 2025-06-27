@@ -31,6 +31,11 @@ type ProgressNotification = {
   };
 };
 
+type RootsListChangedNotification = {
+  method: "notifications/roots/list_changed";
+  params?: Record<string, never>;
+};
+
 export async function sendOperationNotification(operation: string, message: string, sessionId?: string): Promise<void> {
   const notification: ServerNotification = {
     method: "notifications/message",
@@ -100,8 +105,16 @@ export async function sendProgressNotification(
   await sendNotification(notification, sessionId);
 }
 
+export async function sendRootsListChangedNotification(): Promise<void> {
+  const notification: RootsListChangedNotification = {
+    method: "notifications/roots/list_changed",
+    params: {}
+  };
+  await sendNotification(notification);
+}
+
 async function sendNotification(
-  notification: ServerNotification | SamplingCompleteNotification | RedditConfigNotification | ProgressNotification,
+  notification: ServerNotification | SamplingCompleteNotification | RedditConfigNotification | ProgressNotification | RootsListChangedNotification,
   sessionId?: string
 ) {
   const handler = getMCPHandlerInstance();

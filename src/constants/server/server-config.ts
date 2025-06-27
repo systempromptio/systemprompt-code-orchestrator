@@ -91,6 +91,10 @@ export const serverCapabilities: { capabilities: ServerCapabilities } = {
     prompts: {},    // Dynamic prompt generation
     resources: {},  // Resource listing and reading
     logging: {},    // Client-requested logging support
+    roots: {        // Filesystem roots support
+      listChanged: true  // We support roots/list_changed notifications
+    },
+    resourceTemplates: {},  // Resource templates support for dynamic URIs
   },
 };
 

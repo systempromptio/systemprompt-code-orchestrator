@@ -14,7 +14,6 @@ import { config } from 'dotenv';
 config({ path: '.env' });
 
 export const MCP_BASE_URL = process.env.MCP_BASE_URL || `http://127.0.0.1:${process.env.PORT || '3000'}`;
-export const ACCESS_TOKEN = process.env.MCP_ACCESS_TOKEN;
 
 /**
  * Colored console output utilities
@@ -71,10 +70,6 @@ export class TestTracker {
  * Create and connect MCP client
  */
 export async function createMCPClient(): Promise<Client> {
-  if (!ACCESS_TOKEN) {
-    throw new Error('Missing MCP_ACCESS_TOKEN in environment');
-  }
-  
   log.debug(`Connecting to MCP server at ${MCP_BASE_URL}`);
   
   const transport = new StreamableHTTPClientTransport(
@@ -82,7 +77,6 @@ export async function createMCPClient(): Promise<Client> {
     {
       requestInit: {
         headers: {
-          'Authorization': `Bearer ${ACCESS_TOKEN}`,
           'Accept': 'application/json, text/event-stream',
           'Content-Type': 'application/json'
         }
@@ -100,7 +94,7 @@ export async function createMCPClient(): Promise<Client> {
         prompts: {},
         resources: {},
         tools: {},
-        sampling: {}
+        // sampling: {} // Removed sampling
       }
     }
   );

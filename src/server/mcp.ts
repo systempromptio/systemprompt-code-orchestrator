@@ -1,5 +1,5 @@
 /**
- * @file MCP protocol handler with session management
+ * @file MCP protocol handler with session management (no authentication)
  * @module server/mcp
  *
  * @remarks
@@ -7,6 +7,7 @@
  * - One Server instance per session
  * - Each Server has its own StreamableHTTPServerTransport
  * - Session isolation and management
+ * - No authentication required
  */
 
 import express from "express";
@@ -20,6 +21,8 @@ import {
   GetPromptRequestSchema,
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
+  ListRootsRequestSchema,
+  ListResourceTemplatesRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { serverConfig, serverCapabilities } from "../constants/server/server-config.js";
@@ -27,29 +30,21 @@ import { sendSamplingRequest } from "../handlers/sampling.js";
 import { handleListTools, handleToolCall } from "../handlers/tool-handlers.js";
 import { handleListPrompts, handleGetPrompt } from "../handlers/prompt-handlers.js";
 import { handleListResources, handleResourceCall } from "../handlers/resource-handlers.js";
+import { handleListRoots } from "../handlers/roots-handlers.js";
+import { handleListResourceTemplates } from "../handlers/resource-templates-handler.js";
 import { logger } from "../utils/logger.js";
 import { rateLimitMiddleware, validateProtocolVersion, requestSizeLimit } from "./middleware.js";
-import type { RedditAuthInfo } from "../types/request-context.js";
-import type { AuthenticatedRequest } from "./oauth.js";
-
-// Per-session auth context storage
-interface SessionAuth {
-  accessToken: string;
-  refreshToken: string;
-  username: string;
-}
 
 interface SessionInfo {
   server: Server;
   transport: StreamableHTTPServerTransport;
-  auth?: SessionAuth;
   createdAt: Date;
   lastAccessed: Date;
 }
 
 // Interface for MCP Handler
 export interface IMCPHandler {
-  setupRoutes(app: express.Application, authMiddleware: express.RequestHandler): Promise<void>;
+  setupRoutes(app: express.Application): Promise<void>;
   getServerForSession(sessionId: string): Server | undefined;
   getAllServers(): Server[];
   getServer(): Server;
@@ -63,27 +58,28 @@ export interface IMCPHandler {
  */
 export class MCPHandler implements IMCPHandler {
   private sessions = new Map<string, SessionInfo>();
-  
+
   // Session cleanup interval (clear sessions older than 1 hour)
   private cleanupInterval: NodeJS.Timeout;
   private readonly SESSION_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
 
   constructor() {
     // Start session cleanup interval
-    this.cleanupInterval = setInterval(() => {
-      this.cleanupOldSessions();
-    }, 5 * 60 * 1000); // Run every 5 minutes
-    
-    logger.info('🚀 Correct MCP Handler initialized (one server per session)');
+    this.cleanupInterval = setInterval(
+      () => {
+        this.cleanupOldSessions();
+      },
+      5 * 60 * 1000,
+    ); // Run every 5 minutes
   }
 
   /**
    * Creates a new server instance with handlers
    */
-  private createServer(sessionId: string, sessionAuth?: SessionAuth): Server {
+  private createServer(sessionId: string): Server {
     // Create new server instance for this session
     const server = new Server(serverConfig, serverCapabilities);
-    
+
     // Tools
     server.setRequestHandler(ListToolsRequestSchema, (request) => {
       logger.debug(`📋 [${sessionId}] Listing tools`);
@@ -92,23 +88,9 @@ export class MCPHandler implements IMCPHandler {
 
     server.setRequestHandler(CallToolRequestSchema, (request) => {
       logger.debug(`🔧 [${sessionId}] Calling tool: ${request.params.name}`);
-      
-      if (!sessionAuth) {
-        throw new Error('Authentication required for tool calls');
-      }
-      
-      const authInfo: RedditAuthInfo = {
-        token: sessionAuth.accessToken,
-        clientId: 'mcp-client',
-        scopes: ['read'],
-        extra: {
-          userId: sessionAuth.username,
-          redditAccessToken: sessionAuth.accessToken,
-          redditRefreshToken: sessionAuth.refreshToken
-        }
-      };
-      
-      return handleToolCall(request, { sessionId, authInfo });
+      logger.info(`MCP tool request params:`, JSON.stringify(request.params, null, 2));
+      logger.info(`MCP tool request full:`, JSON.stringify(request, null, 2));
+      return handleToolCall(request, { sessionId });
     });
 
     // Prompts
@@ -130,103 +112,94 @@ export class MCPHandler implements IMCPHandler {
 
     server.setRequestHandler(ReadResourceRequestSchema, (request) => {
       logger.debug(`📖 [${sessionId}] Reading resource: ${request.params.uri}`);
-      
-      const authInfo = sessionAuth ? {
-        token: sessionAuth.accessToken,
-        clientId: 'mcp-client',
-        scopes: ['read'],
-        extra: {
-          userId: sessionAuth.username,
-          redditAccessToken: sessionAuth.accessToken,
-          redditRefreshToken: sessionAuth.refreshToken
-        }
-      } : undefined;
-      
-      return handleResourceCall(request, authInfo ? { authInfo } : undefined);
+      return handleResourceCall(request);
     });
 
     // Sampling
     server.setRequestHandler(CreateMessageRequestSchema, (request) => {
       return sendSamplingRequest(request, { sessionId });
     });
-    
+
+    // Roots
+    server.setRequestHandler(ListRootsRequestSchema, (request) => {
+      logger.debug(`📁 [${sessionId}] Listing roots`);
+      return handleListRoots(request);
+    });
+
+    // Resource Templates
+    server.setRequestHandler(ListResourceTemplatesRequestSchema, (request) => {
+      logger.debug(`📋 [${sessionId}] Listing resource templates`);
+      logger.info(`Resource templates request:`, JSON.stringify(request, null, 2));
+      return handleListResourceTemplates(request);
+    });
+
     return server;
   }
 
   /**
    * Sets up routes for the Express app
    */
-  async setupRoutes(app: express.Application, authMiddleware: express.RequestHandler): Promise<void> {
-    // Apply middleware stack
+  async setupRoutes(app: express.Application): Promise<void> {
+    // Apply middleware stack (no auth required)
     const mcpMiddleware = [
-      authMiddleware,
       rateLimitMiddleware(60000, 100), // 100 requests per minute
       validateProtocolVersion,
       requestSizeLimit(10 * 1024 * 1024), // 10MB max
     ];
 
-    // Main MCP endpoint
-    app.all("/mcp", ...mcpMiddleware, (req, res) =>
-      this.handleRequest(req as AuthenticatedRequest, res),
-    );
+    // Main MCP endpoint (public access)
+    app.all("/mcp", ...mcpMiddleware, (req, res) => this.handleRequest(req, res));
   }
 
   /**
    * Handles incoming MCP requests with proper session management
    */
-  private async handleRequest(req: AuthenticatedRequest, res: express.Response): Promise<void> {
+  private async handleRequest(req: express.Request, res: express.Response): Promise<void> {
     const startTime = Date.now();
 
     try {
       // Set CORS headers
       res.header("Access-Control-Expose-Headers", "mcp-session-id, x-session-id");
-      
+
       // Extract session ID from headers
-      let sessionId = req.headers['mcp-session-id'] as string || req.headers['x-session-id'] as string;
-      
+      let sessionId =
+        (req.headers["mcp-session-id"] as string) || (req.headers["x-session-id"] as string);
+
       // For init requests, we need to check the request without a session
       // The transport will handle body parsing
       const isInitRequest = !sessionId;
-      
+
       let sessionInfo: SessionInfo | undefined;
-      
+
       if (isInitRequest) {
         // Create new session for initialization
         sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-        
-        // Extract auth info if available
-        const sessionAuth = req.auth && req.auth.extra?.redditAccessToken ? {
-          accessToken: String(req.auth.extra.redditAccessToken || ''),
-          refreshToken: String(req.auth.extra.redditRefreshToken || ''),
-          username: String(req.auth.extra.userId || 'unknown')
-        } : undefined;
-        
+
         // Create new server instance for this session
-        const server = this.createServer(sessionId, sessionAuth);
-        
+        const server = this.createServer(sessionId);
+
         // Create new transport for this session
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => sessionId!,
           onsessioninitialized: (sid) => {
             logger.info(`🔗 New session initialized: ${sid}`);
-          }
+          },
         });
-        
+
         // Connect server to transport (one-to-one relationship)
         await server.connect(transport);
-        
+
         // Store session info
         sessionInfo = {
           server,
           transport,
-          auth: sessionAuth,
           createdAt: new Date(),
-          lastAccessed: new Date()
+          lastAccessed: new Date(),
         };
         this.sessions.set(sessionId, sessionInfo);
-        
+
         logger.debug(`📝 Created new session with dedicated server: ${sessionId}`);
-        
+
         // Let transport handle the initialization request
         await transport.handleRequest(req, res);
       } else {
@@ -236,52 +209,38 @@ export class MCPHandler implements IMCPHandler {
             jsonrpc: "2.0",
             error: {
               code: -32600,
-              message: "Invalid Request: Missing session ID"
+              message: "Invalid Request: Missing session ID",
             },
-            id: null
+            id: null,
           });
           return;
         }
-        
+
         sessionInfo = this.sessions.get(sessionId);
         if (!sessionInfo) {
           res.status(404).json({
             jsonrpc: "2.0",
             error: {
               code: -32001,
-              message: "Session not found"
+              message: "Session not found",
             },
-            id: null
+            id: null,
           });
           return;
         }
-        
+
         sessionInfo.lastAccessed = new Date();
-        
-        // Update auth if provided
-        if (req.auth && req.auth.extra?.redditAccessToken && !sessionInfo.auth) {
-          sessionInfo.auth = {
-            accessToken: String(req.auth.extra.redditAccessToken || ''),
-            refreshToken: String(req.auth.extra.redditRefreshToken || ''),
-            username: String(req.auth.extra.userId || 'unknown')
-          };
-          
-          // Recreate server with auth
-          const newServer = this.createServer(sessionId, sessionInfo.auth);
-          await newServer.connect(sessionInfo.transport);
-          sessionInfo.server = newServer;
-        }
-        
+
         // Let the session's transport handle the request
         await sessionInfo.transport.handleRequest(req, res);
       }
-      
+
       logger.debug(`MCP request completed in ${Date.now() - startTime}ms for session ${sessionId}`);
     } catch (error) {
       logger.error("MCP request failed", {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
-        duration: Date.now() - startTime
+        duration: Date.now() - startTime,
       });
 
       if (!res.headersSent) {
@@ -303,7 +262,7 @@ export class MCPHandler implements IMCPHandler {
   private cleanupOldSessions(): void {
     const now = Date.now();
     let cleaned = 0;
-    
+
     for (const [sessionId, sessionInfo] of this.sessions.entries()) {
       const age = now - sessionInfo.lastAccessed.getTime();
       if (age > this.SESSION_TIMEOUT_MS) {
@@ -314,7 +273,7 @@ export class MCPHandler implements IMCPHandler {
         cleaned++;
       }
     }
-    
+
     if (cleaned > 0) {
       logger.info(`🧹 Cleaned up ${cleaned} old sessions`);
     }
@@ -332,7 +291,7 @@ export class MCPHandler implements IMCPHandler {
    * Get all active servers
    */
   getAllServers(): Server[] {
-    return Array.from(this.sessions.values()).map(info => info.server);
+    return Array.from(this.sessions.values()).map((info) => info.server);
   }
 
   /**
@@ -374,15 +333,15 @@ export class MCPHandler implements IMCPHandler {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
     }
-    
+
     // Close all sessions
     for (const sessionInfo of this.sessions.values()) {
       sessionInfo.server.close();
       sessionInfo.transport.close();
     }
     this.sessions.clear();
-    
-    logger.info('🛑 MCP Handler shut down');
+
+    logger.info("🛑 MCP Handler shut down");
   }
 }
 

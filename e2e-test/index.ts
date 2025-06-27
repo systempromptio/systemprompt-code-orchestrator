@@ -9,8 +9,8 @@
 import { testTools } from './typescript/test-tools.js';
 import { testPrompts } from './typescript/test-prompts.js';
 import { testResources } from './typescript/test-resources.js';
-import { testSampling } from './typescript/test-sampling.js';
 import { testConcurrent } from './typescript/test-concurrent.js';
+import { testCheckStatus } from './typescript/test-check-status.js';
 
 const log = {
   title: (msg: string) => console.log(`\n\x1b[1m\x1b[35m${msg}\x1b[0m`),
@@ -28,12 +28,12 @@ const testSuites: TestSuite[] = [
   { name: 'Tools', run: testTools },
   { name: 'Prompts', run: testPrompts },
   { name: 'Resources', run: testResources },
-  { name: 'Sampling', run: testSampling },
-  { name: 'Concurrent Operations', run: testConcurrent }
+  { name: 'Concurrent Operations', run: testConcurrent },
+  { name: 'Check Status', run: testCheckStatus }
 ];
 
 async function runAllTests(): Promise<void> {
-  log.title('🚀 MCP Server E2E Test Suite');
+  log.title('🚀 Coding Agent MCP Server E2E Test Suite');
   log.section('Running all tests...');
   
   const results: { name: string; passed: boolean; error?: string }[] = [];

@@ -1,62 +1,28 @@
 #!/usr/bin/env node
 /**
- * @file Main HTTP server for Reddit MCP
+ * @file Main HTTP server for Coding Agent MCP
  * @module server
  * 
  * @remarks
  * This module provides the Express.js HTTP server that handles:
- * - OAuth 2.1 authentication flows (Steps 1-8 of MCP OAuth spec)
- * - MCP protocol endpoints with authentication
+ * - MCP protocol endpoints (no authentication)
  * - Health checks and metadata endpoints
- * 
- * OAuth Flow Integration:
- * @see https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization
- * 
- * 1. Client requests /mcp without auth → 401 with WWW-Authenticate
- * 2. Client discovers metadata endpoints from WWW-Authenticate
- * 3. Client gets auth server info from /.well-known endpoints
- * 4. Client optionally registers at /oauth/register
- * 5. User authorizes at /oauth/authorize (redirects to Reddit)
- * 6. Reddit calls back to /oauth/reddit/callback
- * 7. Client exchanges code at /oauth/token
- * 8. Client uses JWT token for authenticated /mcp requests
- * 
- * The server can be run standalone or integrated with platforms like Smithery.
  */
 
 import express from 'express';
 import cors from 'cors';
-import cookieParser from 'cookie-parser';
-import crypto from 'crypto';
-import { CONFIG, VALID_REDIRECT_URIS } from './server/config.js';
-import { OAuthProvider } from './server/oauth.js';
+import { CONFIG } from './server/config.js';
 import { MCPHandler } from './server/mcp.js';
 import { setMCPHandlerInstance } from './server/mcp.js';
 
-// Polyfill for jose library
-if (typeof globalThis.crypto === 'undefined') {
-  // @ts-ignore
-  globalThis.crypto = crypto.webcrypto as any;
-}
 
 /**
  * Creates and configures the Express application
  * 
- * @remarks
- * Sets up the complete MCP OAuth flow:
- * - OAuthProvider handles Steps 1-7 (auth flow)
- * - MCPHandler handles Step 8 (authenticated requests)
- * 
- * @returns Configured Express application with OAuth endpoints
+ * @returns Configured Express application with MCP endpoint
  */
 export async function createApp(): Promise<express.Application> {
   const app = express();
-  
-  // Initialize OAuth provider for MCP authentication
-  const oauthProvider = new OAuthProvider({
-    ...CONFIG,
-    validRedirectUris: VALID_REDIRECT_URIS,
-  });
   
   // Initialize MCP handler for protocol implementation with proper session support
   const mcpHandler = new MCPHandler();
@@ -73,8 +39,6 @@ export async function createApp(): Promise<express.Application> {
       exposedHeaders: ['mcp-session-id', 'x-session-id'],
     })
   );
-  
-  app.use(cookieParser());
 
   // Selective body parsing - skip for MCP streaming endpoints
   app.use((req, res, next) => {
@@ -89,8 +53,7 @@ export async function createApp(): Promise<express.Application> {
   });
 
   // Set up routes
-  oauthProvider.setupRoutes(app);
-  await mcpHandler.setupRoutes(app, oauthProvider.authMiddleware());
+  await mcpHandler.setupRoutes(app);
   setupUtilityRoutes(app);
 
   return app;
@@ -104,10 +67,9 @@ function setupUtilityRoutes(app: express.Application): void {
   app.get('/health', (_, res) => {
     res.json({
       status: 'ok',
-      service: 'reddit-mcp-server',
+      service: 'coding-agent-mcp-server',
       transport: 'http',
       capabilities: {
-        oauth: true,
         mcp: true,
       },
     });
@@ -122,15 +84,10 @@ function setupUtilityRoutes(app: express.Application): void {
     const basePath = req.baseUrl || '';
     
     res.json({
-      service: 'Reddit MCP Server',
+      service: 'Coding Agent MCP Server',
       version: '1.0.0',
       transport: 'http',
       endpoints: {
-        oauth: {
-          authorize: `${baseUrl}${basePath}/oauth/authorize`,
-          token: `${baseUrl}${basePath}/oauth/token`,
-          metadata: `${baseUrl}/.well-known/oauth-authorization-server`,
-        },
         mcp: `${baseUrl}${basePath}/mcp`,
         health: `${baseUrl}${basePath}/health`,
       },
@@ -149,10 +106,9 @@ export async function startServer(port?: number): Promise<ReturnType<express.App
   const serverPort = port || parseInt(CONFIG.PORT, 10);
   
   return app.listen(serverPort, '0.0.0.0', () => {
-    console.log(`🚀 Reddit MCP Server running on port ${serverPort}`);
-    console.log(`🔐 OAuth authorize: ${CONFIG.OAUTH_ISSUER}/oauth/authorize`);
-    console.log(`📡 MCP endpoint: ${CONFIG.OAUTH_ISSUER}/mcp`);
-    console.log(`❤️  Health: ${CONFIG.OAUTH_ISSUER}/health`);
+    console.log(`🚀 Coding Agent MCP Server running on port ${serverPort}`);
+    console.log(`📡 MCP endpoint: http://localhost:${serverPort}/mcp`);
+    console.log(`❤️  Health: http://localhost:${serverPort}/health`);
   });
 }
 

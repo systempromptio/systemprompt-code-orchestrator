@@ -3,7 +3,7 @@
  * @module test-concurrent
  * 
  * @remarks
- * Tests concurrent MCP operations
+ * Tests concurrent operations and session management
  */
 
 import { createMCPClient, log, TestTracker, runTest } from './test-utils.js';
@@ -13,102 +13,158 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
  * Test concurrent tool calls
  */
 async function testConcurrentTools(client: Client): Promise<void> {
-  // Execute multiple tool calls concurrently
-  const promises = [
-    client.callTool({ name: 'validation_example', arguments: { name: 'Test One', age: 25, email: 'test1@example.com', role: 'user' } }),
-    client.callTool({ name: 'validation_example', arguments: { name: 'Test Two', age: 30, email: 'test2@example.com', role: 'admin' } }),
-    client.callTool({ name: 'structured_data_example', arguments: { dataType: 'user' } }),
-    client.callTool({ name: 'structured_data_example', arguments: { dataType: 'product' } }),
-    client.callTool({ name: 'search_reddit', arguments: { query: 'typescript', limit: 3 } })
-  ];
+  // Create multiple tasks concurrently
+  const taskPromises = Array.from({ length: 3 }, (_, i) => 
+    client.callTool({
+      name: 'create_task',
+      arguments: {
+        title: `Concurrent Task ${i + 1}`,
+        description: `Testing concurrent task creation ${i + 1}`,
+        model: i % 2 === 0 ? 'claude' : 'gemini',
+        command: `echo "Task ${i + 1} running"`,
+        project_path: `/tmp/concurrent-test-${i + 1}`,
+        priority: 'low',
+        start_immediately: false
+      }
+    })
+  );
   
-  const results = await Promise.all(promises);
+  const results = await Promise.all(taskPromises);
   
-  // Verify all results are valid
-  for (let i = 0; i < results.length; i++) {
-    const content = results[i].content as any[];
-    if (!content?.[0]?.text) {
-      throw new Error(`Concurrent tool call ${i} returned no content`);
+  // Verify all tasks were created
+  const taskIds: string[] = [];
+  for (const result of results) {
+    const content = result.content as any[];
+    const taskData = JSON.parse(content[0].text);
+    if (!taskData.task_id) {
+      throw new Error('Concurrent task creation failed - missing task_id');
     }
+    taskIds.push(taskData.task_id);
   }
+  
+  log.debug(`Created ${taskIds.length} tasks concurrently`);
+  
+  // Clean up
+  await Promise.all(taskIds.map(id => 
+    client.callTool({
+      name: 'end_task',
+      arguments: {
+        task_id: id,
+        status: 'cancelled',
+        summary: 'Cleaned up after concurrent test'
+      }
+    })
+  ));
 }
 
 /**
- * Test concurrent list operations
+ * Test concurrent resource reads
  */
-async function testConcurrentLists(client: Client): Promise<void> {
-  // Execute multiple list operations concurrently
-  const [tools, prompts, resources] = await Promise.all([
-    client.listTools(),
-    client.listPrompts(),
-    client.listResources()
-  ]);
+async function testConcurrentResources(client: Client): Promise<void> {
+  // Read multiple resources concurrently
+  const resourcePromises = [
+    client.readResource({ uri: 'agent://status' }),
+    client.readResource({ uri: 'agent://tasks' }),
+    client.readResource({ uri: 'agent://sessions' })
+  ];
   
-  if (!tools.tools || tools.tools.length === 0) {
-    throw new Error('Concurrent listTools returned no tools');
+  const results = await Promise.all(resourcePromises);
+  
+  // Verify all resources were read successfully
+  for (const result of results) {
+    if (!result.contents || result.contents.length === 0) {
+      throw new Error('Concurrent resource read failed');
+    }
   }
   
-  if (!prompts.prompts || prompts.prompts.length === 0) {
-    throw new Error('Concurrent listPrompts returned no prompts');
-  }
-  
-  if (!resources.resources || resources.resources.length === 0) {
-    throw new Error('Concurrent listResources returned no resources');
-  }
+  log.debug('Successfully read 3 resources concurrently');
 }
 
 /**
  * Test mixed concurrent operations
  */
 async function testMixedConcurrent(client: Client): Promise<void> {
-  // Mix different types of operations
-  const promises = [
-    client.listTools(),
-    client.callTool({ name: 'validation_example', arguments: { name: 'Mixed test', age: 28, email: 'mixed@example.com', role: 'moderator' } }),
-    client.getPrompt({
-      name: 'reddit_suggest_action',
+  // Mix of different operations
+  const operations = Promise.all([
+    // Create a task
+    client.callTool({
+      name: 'create_task',
       arguments: {
-        context: 'Test context for action suggestion'
+        title: 'Mixed Operation Task',
+        description: 'Part of mixed concurrent test',
+        model: 'claude',
+        command: 'echo "Mixed test"',
+        project_path: '/tmp/mixed-test',
+        priority: 'medium',
+        start_immediately: false
       }
     }),
-    client.readResource({ uri: 'guidelines://code-generation' })  // Changed from reddit://config to avoid 403
-  ];
+    // Get stats
+    client.callTool({
+      name: 'update_stats',
+      arguments: {
+        include_tasks: true,
+        include_sessions: true
+      }
+    }),
+    // Read status resource
+    client.readResource({ uri: 'agent://status' }),
+    // List tools
+    client.listTools(),
+    // List prompts
+    client.listPrompts()
+  ]);
   
-  const results = await Promise.all(promises);
+  const results = await operations;
   
-  // Verify each result type
-  if (!results[0].tools) throw new Error('Mixed concurrent: listTools failed');
-  if (!results[1].content) throw new Error('Mixed concurrent: callTool failed');
-  if (!results[2].messages) throw new Error('Mixed concurrent: getPrompt failed');
-  if (!results[3].contents) throw new Error('Mixed concurrent: readResource failed');
+  // Extract task ID for cleanup
+  const createResult = results[0] as any;
+  const taskId = JSON.parse(createResult.content[0].text).task_id;
+  
+  // Verify all operations completed
+  if (results.length !== 5) {
+    throw new Error('Not all concurrent operations completed');
+  }
+  
+  log.debug('Successfully completed 5 mixed concurrent operations');
+  
+  // Clean up
+  await client.callTool({
+    name: 'end_task',
+    arguments: {
+      task_id: taskId,
+      status: 'cancelled',
+      summary: 'Cleaned up after mixed concurrent test'
+    }
+  });
 }
 
 /**
- * Test high-volume concurrent requests
+ * Test rate limiting behavior
  */
-async function testHighVolumeConcurrent(client: Client): Promise<void> {
-  // Create many concurrent requests
-  const requestCount = 20;
-  const promises = [];
+async function testRateLimiting(client: Client): Promise<void> {
+  // Send many requests rapidly to test rate limiting
+  const requests = Array.from({ length: 20 }, () => 
+    client.callTool({
+      name: 'update_stats',
+      arguments: {
+        include_tasks: true,
+        include_sessions: false
+      }
+    }).catch(error => ({ error }))
+  );
   
-  for (let i = 0; i < requestCount; i++) {
-    promises.push(
-      client.callTool({ name: 'validation_example', arguments: { name: 'Test User', age: 20 + i, email: `test${i}@example.com`, role: 'user' } })
-    );
-  }
+  const results = await Promise.all(requests);
   
-  const results = await Promise.all(promises);
+  // Count successful vs rate-limited requests
+  const successful = results.filter(r => !('error' in r)).length;
+  const rateLimited = results.filter(r => 'error' in r).length;
   
-  // Verify all completed successfully
-  if (results.length !== requestCount) {
-    throw new Error(`Expected ${requestCount} results, got ${results.length}`);
-  }
+  log.debug(`Rate limiting test: ${successful} successful, ${rateLimited} rate-limited`);
   
-  for (let i = 0; i < results.length; i++) {
-    const content = results[i].content as any[];
-    if (!content?.[0]?.text) {
-      throw new Error(`High volume request ${i} failed`);
-    }
+  // We expect at least some to succeed
+  if (successful === 0) {
+    throw new Error('All requests were rate-limited');
   }
 }
 
@@ -126,9 +182,9 @@ export async function testConcurrent(): Promise<void> {
     log.success('Connected to MCP server');
     
     await runTest('Concurrent Tools', () => testConcurrentTools(client!), tracker);
-    await runTest('Concurrent Lists', () => testConcurrentLists(client!), tracker);
+    await runTest('Concurrent Resources', () => testConcurrentResources(client!), tracker);
     await runTest('Mixed Concurrent', () => testMixedConcurrent(client!), tracker);
-    await runTest('High Volume Concurrent', () => testHighVolumeConcurrent(client!), tracker);
+    await runTest('Rate Limiting', () => testRateLimiting(client!), tracker);
     
     tracker.printSummary();
     

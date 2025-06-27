@@ -9,7 +9,7 @@ const envPath = path.join(__dirname, '..', '.env');
 // Check if .env file exists
 if (!fs.existsSync(envPath)) {
   console.error('❌ Error: .env file not found in e2e-test directory');
-  console.error('Please create e2e-test/.env with your MCP_ACCESS_TOKEN');
+  console.error('Please create e2e-test/.env with your configuration');
   process.exit(1);
 }
 
@@ -27,17 +27,11 @@ envContent.split('\n').forEach(line => {
   }
 });
 
-// Check for required MCP_ACCESS_TOKEN
-if (!envVars.MCP_ACCESS_TOKEN) {
-  console.error('❌ Error: MCP_ACCESS_TOKEN is not set in .env file');
-  console.error('');
-  console.error('To run the tests, you must obtain a valid OAuth token:');
-  console.error('1. Start the MCP server');
-  console.error('2. Go through the OAuth flow to authenticate with Reddit');
-  console.error('3. Copy the JWT token and set it as MCP_ACCESS_TOKEN in e2e-test/.env');
-  console.error('');
-  console.error('Note: OAuth tokens are valid for 24 hours');
-  process.exit(1);
-}
+console.log('✅ .env file found and loaded');
 
-console.log('✅ MCP_ACCESS_TOKEN found in .env file');
+// Optional: Set MCP_BASE_URL if provided
+if (envVars.MCP_BASE_URL) {
+  console.log(`✅ MCP_BASE_URL set to: ${envVars.MCP_BASE_URL}`);
+} else {
+  console.log('ℹ️  MCP_BASE_URL not set, will use default: http://localhost:3000');
+}

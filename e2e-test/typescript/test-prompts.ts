@@ -3,7 +3,7 @@
  * @module test-prompts
  * 
  * @remarks
- * Tests all MCP prompts functionality
+ * Tests all MCP prompts functionality for the Coding Agent orchestrator
  */
 
 import { createMCPClient, log, TestTracker, runTest } from './test-utils.js';
@@ -23,8 +23,9 @@ async function testPromptDiscovery(client: Client): Promise<void> {
   
   // Verify expected prompts exist
   const expectedPrompts = [
-    'reddit_suggest_action',
-    'code_generation_example'
+    'task_planning',
+    'task_automation',
+    'task_debug'
   ];
   
   for (const promptName of expectedPrompts) {
@@ -44,29 +45,47 @@ async function testPromptDiscovery(client: Client): Promise<void> {
  * Test prompt retrieval and variations
  */
 async function testPromptRetrieval(client: Client): Promise<void> {
-  // Test reddit_suggest_action prompt
-  const replyResult = await client.getPrompt({
-    name: 'reddit_suggest_action',
+  // Test task_planning prompt
+  const planningResult = await client.getPrompt({
+    name: 'task_planning',
     arguments: {
-      context: 'User is asking for help with MCP implementation'
+      task_description: 'Build a REST API with authentication',
+      constraints: 'Must use TypeScript and Express'
     }
   });
   
-  if (!replyResult.messages || replyResult.messages.length === 0) {
-    throw new Error('reddit_suggest_action returned no messages');
+  if (!planningResult.messages || planningResult.messages.length < 2) {
+    throw new Error('task_planning prompt returned insufficient messages');
   }
   
-  // Test code_generation_example prompt
-  const draftResult = await client.getPrompt({
-    name: 'code_generation_example',
+  const planningAssistantMsg = planningResult.messages.find(m => m.role === 'assistant');
+  if (!planningAssistantMsg || !planningAssistantMsg.content.text) {
+    throw new Error('task_planning prompt missing assistant response');
+  }
+  
+  // Test task_automation prompt
+  const automationResult = await client.getPrompt({
+    name: 'task_automation',
     arguments: {
-      language: 'typescript',
-      task: 'Create a simple function'
+      process_description: 'Daily backup of database to S3',
+      target_environment: 'docker'
     }
   });
   
-  if (!draftResult.messages || draftResult.messages.length === 0) {
-    throw new Error('code_generation_example returned no messages');
+  if (!automationResult.messages || automationResult.messages.length < 2) {
+    throw new Error('task_automation prompt returned insufficient messages');
+  }
+  
+  // Test task_debug prompt with minimal arguments
+  const debugResult = await client.getPrompt({
+    name: 'task_debug',
+    arguments: {
+      task_id: 'test_task_123'
+    }
+  });
+  
+  if (!debugResult.messages || debugResult.messages.length < 2) {
+    throw new Error('task_debug prompt returned insufficient messages');
   }
 }
 
@@ -74,28 +93,59 @@ async function testPromptRetrieval(client: Client): Promise<void> {
  * Test prompt argument validation
  */
 async function testPromptValidation(client: Client): Promise<void> {
-  // Test with missing required arguments
+  // Test with missing required argument
   try {
     await client.getPrompt({
-      name: 'reddit_suggest_action',
-      arguments: {
-        // Missing required context
-      }
+      name: 'task_planning',
+      arguments: {}  // Missing required task_description
     });
-    throw new Error('Expected error for missing required arguments');
+    throw new Error('Expected error for missing required argument');
   } catch (error) {
     // Expected error
   }
   
-  // Test with invalid prompt name
+  // Test with non-existent prompt
   try {
     await client.getPrompt({
-      name: 'invalid_prompt_name',
+      name: 'non_existent_prompt',
       arguments: {}
     });
-    throw new Error('Expected error for invalid prompt name');
+    throw new Error('Expected error for non-existent prompt');
   } catch (error) {
     // Expected error
+  }
+}
+
+/**
+ * Test prompt with all optional arguments
+ */
+async function testPromptOptionalArgs(client: Client): Promise<void> {
+  // Test task_debug with all arguments
+  const result = await client.getPrompt({
+    name: 'task_debug',
+    arguments: {
+      task_id: 'test_task_456',
+      issue_description: 'Task fails with permission denied error'
+    }
+  });
+  
+  if (!result.messages || result.messages.length < 2) {
+    throw new Error('task_debug prompt with optional args returned insufficient messages');
+  }
+  
+  // Verify argument substitution
+  const userMsg = result.messages.find(m => m.role === 'user');
+  if (!userMsg || !userMsg.content?.text) {
+    throw new Error('User message missing');
+  }
+  
+  const userText = String(userMsg.content.text);
+  if (!userText.includes('test_task_456')) {
+    throw new Error('task_id argument not substituted correctly');
+  }
+  
+  if (!userText.includes('permission denied')) {
+    throw new Error('issue_description argument not substituted correctly');
   }
 }
 
@@ -115,6 +165,7 @@ export async function testPrompts(): Promise<void> {
     await runTest('Prompt Discovery', () => testPromptDiscovery(client!), tracker);
     await runTest('Prompt Retrieval', () => testPromptRetrieval(client!), tracker);
     await runTest('Prompt Validation', () => testPromptValidation(client!), tracker);
+    await runTest('Optional Arguments', () => testPromptOptionalArgs(client!), tracker);
     
     tracker.printSummary();
     

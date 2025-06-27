@@ -63,7 +63,7 @@ export async function handleGetPrompt(
     return content.type === 'text';
   }
 
-  const messages = await Promise.all(prompt.messages.map(async (message: PromptMessage) => {
+  const messages = await Promise.all((prompt as any).messages.map(async (message: PromptMessage) => {
     if (!isTextContent(message.content)) {
       return message;
     }

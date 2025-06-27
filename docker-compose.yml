@@ -1,24 +1,44 @@
 version: '3.8'
 
 services:
-  mcp-server-full:
+  mcp-server:
     build:
       context: .
-      args:
-        PORT: ${PORT:-3000}
+      dockerfile: Dockerfile
     ports:
-      - "${PORT:-3000}:${PORT:-3000}"
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - STATE_PATH=/data/state
+      - PROJECTS_PATH=/data/projects
+      - FILE_ROOT=/workspace
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     env_file:
       - .env
-    environment:
-      - NODE_ENV=development
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${PORT:-3000}/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
     volumes:
-      # Optional: mount logs directory for debugging
-      - ./logs:/app/logs
+      # Persistent state storage
+      - coding-agent-state:/data/state
+      # Projects directory for code execution
+      - ${PROJECTS_PATH:-./projects}:/data/projects
+      # Mount local workspace for file operations
+      - ${HOST_FILE_ROOT:-/var/www/html/systemprompt-coding-agent}:/workspace:rw
+      # Docker socket for container management (optional)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    network_mode: "host"
+    depends_on:
+      - mcp-server
+    restart: unless-stopped
+
+volumes:
+  coding-agent-state:
+    name: coding-agent-state
+    driver: local
