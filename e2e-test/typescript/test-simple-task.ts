@@ -18,12 +18,9 @@ async function main() {
         instructions: 'Say hello',
         branch: 'test-' + Date.now()
       }
-    }, {
-      // Increase timeout for tool call
-      _meta: { progressToken: null }
     });
     
-    log.info('Result:', JSON.stringify(result, null, 2));
+    log.info('Result: ' + JSON.stringify(result, null, 2));
     
     // Get the task ID
     const content = result.content as any[];
@@ -33,13 +30,13 @@ async function main() {
     if (taskId) {
       // Read task
       const task = await client.readResource({ uri: `task://${taskId}` });
-      const taskInfo = JSON.parse(task.contents[0].text);
-      log.info('Task status:', taskInfo.status);
-      log.info('Task logs:', taskInfo.logs);
+      const taskInfo = JSON.parse(task.contents[0].text as string);
+      log.info('Task status: ' + taskInfo.status);
+      log.info('Task logs: ' + JSON.stringify(taskInfo.logs));
     }
     
   } catch (error) {
-    log.error('Error:', error);
+    log.error('Error: ' + error);
   } finally {
     await client.close();
   }

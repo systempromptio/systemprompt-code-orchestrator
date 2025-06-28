@@ -1,0 +1,22 @@
+{
+  "name": "@systemprompt/host-bridge-daemon",
+  "version": "3.0.0",
+  "description": "TypeScript daemon that bridges Docker containers to host CLI tools (Claude, Gemini, etc.)",
+  "type": "module",
+  "main": "dist/host-bridge-daemon.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/host-bridge-daemon.js",
+    "dev": "npm run build && npm start",
+    "clean": "rm -rf dist"
+  },
+  "keywords": ["bridge", "daemon", "mcp", "typescript", "claude", "gemini"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

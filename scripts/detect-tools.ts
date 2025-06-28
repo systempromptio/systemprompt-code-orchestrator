@@ -4,10 +4,18 @@
  * Detect available tools and their paths
  */
 
-const { execSync } = require('child_process');
-const fs = require('fs');
+import { execSync } from 'child_process';
+import * as fs from 'fs';
 
-function detectTool(command) {
+interface ToolsConfig {
+  CLAUDE_PATH: string | null;
+  GEMINI_PATH: string | null;
+  SHELL_PATH: string;
+  CLAUDE_AVAILABLE: boolean;
+  GEMINI_AVAILABLE: boolean;
+}
+
+function detectTool(command: string): string | null {
   try {
     // First try to find in standard locations (prefer global installations)
     const standardPaths = [
@@ -44,7 +52,7 @@ function detectTool(command) {
   }
 }
 
-function detectShell() {
+function detectShell(): string {
   // Try to find a working shell
   const shells = ['/bin/bash', '/usr/bin/bash', '/bin/sh', '/usr/bin/sh'];
   for (const shell of shells) {
@@ -60,8 +68,8 @@ function detectShell() {
   return '/bin/sh'; // Fallback
 }
 
-function main() {
-  const tools = {
+export function detectTools(): ToolsConfig {
+  const tools: ToolsConfig = {
     CLAUDE_PATH: detectTool('claude'),
     GEMINI_PATH: detectTool('gemini'),
     SHELL_PATH: detectShell(),
@@ -105,11 +113,9 @@ function main() {
   return tools;
 }
 
-// Export for use in other scripts
-if (require.main === module) {
-  const tools = main();
+// Run if called directly
+if (process.argv[1] === new URL(import.meta.url).pathname) {
+  const tools = detectTools();
   console.log('\nDetected configuration:');
   console.log(JSON.stringify(tools, null, 2));
-} else {
-  module.exports = { detectTools: main };
 }

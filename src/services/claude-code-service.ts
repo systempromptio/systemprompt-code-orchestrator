@@ -135,6 +135,7 @@ export class ClaudeCodeService extends EventEmitter {
         console.log('[ClaudeCodeService] Connected to host proxy');
         
         const message = JSON.stringify({
+          tool: 'claude',
           command: prompt,
           workingDirectory: hostWorkingDirectory
         });

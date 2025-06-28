@@ -1,0 +1,25 @@
+# Development test files
+# These are temporary test scripts used during development
+# and should not be tracked in version control
+
+# Ignore all test scripts in this directory
+test-*.js
+test-*.cjs
+test-*.mjs
+test-*.ts
+
+# Ignore any temporary output files
+*.tmp
+*.out
+*.log
+
+# Ignore node modules if any test installs local dependencies
+node_modules/
+
+# Ignore any test data or results
+test-results/
+test-data/
+*.test-output
+
+# Keep this .gitignore file
+!.gitignore

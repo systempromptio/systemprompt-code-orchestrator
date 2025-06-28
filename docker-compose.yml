@@ -16,6 +16,10 @@ services:
       - PROJECTS_PATH=/data/projects
       - FILE_ROOT=/workspace
       - PROJECT_ROOT=/workspace
+      - HOST_FILE_ROOT=${HOST_FILE_ROOT}
+      - CLAUDE_PROXY_HOST=${CLAUDE_PROXY_HOST:-host.docker.internal}
+      - CLAUDE_PROXY_PORT=${CLAUDE_PROXY_PORT:-9876}
+      - CLAUDE_AVAILABLE=${CLAUDE_AVAILABLE:-false}
       # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}  # Commented out - using authenticated user session
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     env_file:
