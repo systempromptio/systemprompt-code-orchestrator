@@ -4,15 +4,26 @@
 
 ### Overview
 
+**CRITICAL WORKING DIRECTORY**: The daemon MUST execute all commands in `/var/www/html/systemprompt-coding-agent` on the host machine. This is where:
+- Git operations are performed
+- Claude/Gemini processes are spawned
+- Files are created and modified
+- The actual project repository exists
+
 The Systemprompt Coding Agent uses a three-tier architecture:
 
-1. **Host Machine**: Where the actual project files and git repositories exist
+1. **Host Machine**: Where the actual project files and git repositories exist (`/var/www/html/systemprompt-coding-agent`)
 2. **Daemon (Host Bridge)**: A Node.js process running on the host that acts as a bridge
 3. **Docker Container (MCP Server)**: The isolated environment running the MCP protocol server
 
 ### Critical Design Principle: Git Operations on Host
 
 **IMPORTANT**: All git operations and file manipulations MUST happen on the host machine through the daemon, NOT inside the Docker container.
+
+### Branch Naming Convention
+
+**IMPORTANT**: Git branches MUST include timestamps to ensure uniqueness. Format: `{feature-name}-{timestamp}`
+Example: `e2e-test-1751103517466`
 
 ### Branch-Based Task Execution Flow
 

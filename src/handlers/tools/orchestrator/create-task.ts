@@ -144,9 +144,9 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args, contex
         
         if (agentSessionId) {
           await taskStore.updateTask(taskId, { 
-            assigned_to: agentSessionId,
-            logs: [`Session ${agentSessionId} started with ${validated.tool}`]
+            assigned_to: agentSessionId
           }, sessionId);
+          await taskStore.addLog(taskId, `Session ${agentSessionId} started with ${validated.tool}`, sessionId);
         }
         
     } catch (error) {

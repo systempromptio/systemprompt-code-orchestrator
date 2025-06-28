@@ -28,6 +28,8 @@ interface ValidatedEnvironment {
   CLAUDE_PROXY_PORT: string;
   MCP_PORT: string;
   HOST_FILE_ROOT: string;
+  GIT_AVAILABLE: string;
+  GIT_CURRENT_BRANCH: string;
   errors: string[];
 }
 
@@ -88,8 +90,10 @@ class StartupManager {
       CLAUDE_PROXY_PORT: '9876',
       MCP_PORT: '3010',
       HOST_FILE_ROOT: projectRoot,
+      GIT_AVAILABLE: 'false',
+      GIT_CURRENT_BRANCH: 'none',
       errors: []
-    };
+    } as any;
     
     // Check Claude
     const claudeCommand = await this.findCommand('claude');
@@ -126,6 +130,24 @@ class StartupManager {
       errors.push('docker-compose not found. Please install docker-compose.');
     } else {
       this.success('docker-compose found');
+    }
+    
+    // Check git repository status
+    try {
+      const { stdout } = await execAsync('git rev-parse --is-inside-work-tree', { cwd: projectRoot });
+      if (stdout.trim() === 'true') {
+        this.success(`Git repository found at: ${projectRoot}`);
+        env.GIT_AVAILABLE = 'true';
+        
+        // Get current branch
+        const { stdout: branchOut } = await execAsync('git branch --show-current', { cwd: projectRoot });
+        env.GIT_CURRENT_BRANCH = branchOut.trim() || 'main';
+        this.info(`Current git branch: ${env.GIT_CURRENT_BRANCH}`);
+      }
+    } catch (e) {
+      this.warning('Not a git repository - git operations will be disabled');
+      env.GIT_AVAILABLE = 'false';
+      env.GIT_CURRENT_BRANCH = 'none';
     }
     
     // Load .env if exists

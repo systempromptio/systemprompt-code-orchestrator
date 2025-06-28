@@ -20,6 +20,8 @@ services:
       - CLAUDE_PROXY_HOST=${CLAUDE_PROXY_HOST:-host.docker.internal}
       - CLAUDE_PROXY_PORT=${CLAUDE_PROXY_PORT:-9876}
       - CLAUDE_AVAILABLE=${CLAUDE_AVAILABLE:-false}
+      - GIT_AVAILABLE=${GIT_AVAILABLE:-false}
+      - GIT_CURRENT_BRANCH=${GIT_CURRENT_BRANCH:-none}
       # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}  # Commented out - using authenticated user session
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     env_file:
