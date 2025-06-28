@@ -64,64 +64,22 @@ export class ClaudeCodeService extends EventEmitter {
   }
   
   private async parseProgressFromStream(session: ClaudeCodeSession, data: string): Promise<void> {
-    if (!session.taskId) return;
+    if (!session.taskId || !data.trim()) return;
     
     // Import TaskStore for logging
     const { TaskStore } = await import('./task-store.js');
     const taskStore = TaskStore.getInstance();
     
-    // Log raw stream data for comprehensive tracking
-    await taskStore.addLog(session.taskId, `[STREAM] ${data}`);
+    // Just log what Claude outputs - no complex parsing
+    // Claude outputs are already structured and informative
+    await taskStore.addLog(session.taskId, data.trim());
     
-    // Parse common progress indicators
-    const progressPatterns = [
-      { pattern: /Creating branch ([\w\/-]+)/, event: 'branch:created', logPrefix: 'BRANCH_CREATED' },
-      { pattern: /Switched to .*branch '([\w\/-]+)'/, event: 'branch:switched', logPrefix: 'BRANCH_SWITCHED' },
-      { pattern: /Creating file: (.+)/, event: 'file:creating', logPrefix: 'FILE_CREATING' },
-      { pattern: /File created: (.+)/, event: 'file:created', logPrefix: 'FILE_CREATED' },
-      { pattern: /Reading file: (.+)/, event: 'file:reading', logPrefix: 'FILE_READING' },
-      { pattern: /Writing file: (.+)/, event: 'file:writing', logPrefix: 'FILE_WRITING' },
-      { pattern: /Editing file: (.+)/, event: 'file:editing', logPrefix: 'FILE_EDITING' },
-      { pattern: /Running tests/, event: 'tests:running', logPrefix: 'TESTS_RUNNING' },
-      { pattern: /Tests passed/, event: 'tests:passed', logPrefix: 'TESTS_PASSED' },
-      { pattern: /Tests failed/, event: 'tests:failed', logPrefix: 'TESTS_FAILED' },
-      { pattern: /Building project/, event: 'build:started', logPrefix: 'BUILD_STARTED' },
-      { pattern: /Build complete/, event: 'build:complete', logPrefix: 'BUILD_COMPLETE' },
-      { pattern: /Build failed/, event: 'build:failed', logPrefix: 'BUILD_FAILED' },
-      { pattern: /Executing: (.+)/, event: 'command:executing', logPrefix: 'COMMAND_EXECUTING' },
-      { pattern: /Command output: (.+)/, event: 'command:output', logPrefix: 'COMMAND_OUTPUT' },
-      { pattern: /✓ (.+)/, event: 'step:completed', logPrefix: 'STEP_COMPLETED' },
-      { pattern: /× (.+)/, event: 'step:failed', logPrefix: 'STEP_FAILED' },
-      { pattern: /Error: (.+)/, event: 'error:occurred', logPrefix: 'ERROR' },
-      { pattern: /Warning: (.+)/, event: 'warning:occurred', logPrefix: 'WARNING' },
-      { pattern: /git add (.+)/, event: 'git:add', logPrefix: 'GIT_ADD' },
-      { pattern: /git commit -m "(.+)"/, event: 'git:commit', logPrefix: 'GIT_COMMIT' },
-      { pattern: /git push/, event: 'git:push', logPrefix: 'GIT_PUSH' },
-      { pattern: /npm install/, event: 'npm:install', logPrefix: 'NPM_INSTALL' },
-      { pattern: /npm run (.+)/, event: 'npm:run', logPrefix: 'NPM_RUN' },
-      { pattern: /\{[\s\S]*\}/, event: 'json:output', logPrefix: 'JSON_OUTPUT' },
-      { pattern: /```json[\s\S]*?```/, event: 'json:block', logPrefix: 'JSON_BLOCK' },
-      { pattern: /```[\w]*\n[\s\S]*?```/, event: 'code:block', logPrefix: 'CODE_BLOCK' }
-    ];
-    
-    for (const { pattern, event, logPrefix } of progressPatterns) {
-      const match = data.match(pattern);
-      if (match) {
-        const eventData = match[1] || match[0] || data;
-        
-        // Log specific event
-        await taskStore.addLog(session.taskId, `[${logPrefix}] ${eventData}`);
-        
-        // Emit progress event
-        this.emit('task:progress', {
-          sessionId: session.id,
-          taskId: session.taskId,
-          event,
-          data: eventData,
-          timestamp: new Date()
-        });
-      }
-    }
+    // Emit progress event for real-time monitoring
+    this.emit('task:progress', {
+      taskId: session.taskId,
+      event: 'stream:data',
+      data: data.trim()
+    });
   }
   
   async createSession(options: ClaudeCodeOptions = {}): Promise<string> {

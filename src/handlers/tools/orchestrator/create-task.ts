@@ -32,8 +32,10 @@ interface Task {
   status: "pending" | "in_progress" | "completed" | "failed" | "cancelled";
   created_at: string;
   updated_at: string;
+  started_at?: string;
+  completed_at?: string;
   assigned_to: string | null;
-  progress: number;
+  elapsed_seconds: number;
   logs: string[];
 }
 
@@ -72,7 +74,9 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args, contex
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       assigned_to: null,
-      progress: 0,
+      started_at: undefined,
+      completed_at: undefined,
+      elapsed_seconds: 0,
       logs: [`Task created with ${validated.tool} tool`]
     };
     
@@ -82,7 +86,12 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (args, contex
     let commandResult: any = null;
     
     try {
-        await taskStore.updateTask(taskId, { status: "in_progress" }, sessionId);
+        const startTime = new Date().toISOString();
+        await taskStore.updateTask(taskId, { 
+          status: "in_progress",
+          started_at: startTime
+        }, sessionId);
+        await taskStore.addLog(taskId, `[TASK_STARTED] Beginning task execution at ${startTime}`, sessionId);
         
         await createGitBranch(resolvedProjectPath, validated.branch, taskId, sessionId, taskStore);
         
@@ -303,15 +312,50 @@ async function executeClaudeInstructions(params: {
   const { agentManager, taskStore, agentSessionId, taskId, sessionId, instructions } = params;
   
   try {
-    await taskStore.addLog(taskId, `[INSTRUCTIONS_SENDING] Sending initial instructions...`, sessionId);
+    await taskStore.addLog(taskId, `[INSTRUCTIONS_SENDING] Sending instructions to Claude...`, sessionId);
     
-    const result = await agentManager.sendCommand(agentSessionId, {
-      command: instructions
-    });
+    // Start timer for elapsed time tracking
+    const startTime = Date.now();
+    const updateElapsedTime = setInterval(async () => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      await taskStore.updateTask(taskId, { elapsed_seconds: elapsed }, sessionId);
+    }, 5000); // Update every 5 seconds
     
-    await taskStore.addLog(taskId, `[INSTRUCTIONS_COMPLETED] Claude has finished processing the instructions`, sessionId);
-    await taskStore.updateTask(taskId, { status: 'completed' }, sessionId);
-    await taskStore.addLog(taskId, `[TASK_COMPLETED] Task completed successfully`, sessionId);
+    let result: any;
+    try {
+      // Send the command and let Claude work
+      result = await agentManager.sendCommand(agentSessionId, {
+        command: instructions
+      });
+      
+      clearInterval(updateElapsedTime);
+      const finalElapsed = Math.floor((Date.now() - startTime) / 1000);
+      
+      await taskStore.addLog(taskId, `[EXECUTION_TIME] Claude execution took ${finalElapsed} seconds`, sessionId);
+      
+      // Check if the result indicates success
+      if (result.success) {
+        await taskStore.updateTask(taskId, { 
+          status: 'completed',
+          elapsed_seconds: finalElapsed
+        }, sessionId);
+        await taskStore.addLog(taskId, `[TASK_COMPLETED] Task completed successfully`, sessionId);
+        
+        // Log full output for transparency
+        if (result.output) {
+          await taskStore.addLog(taskId, `[CLAUDE_OUTPUT]\n${result.output}`, sessionId);
+        }
+      } else {
+        await taskStore.updateTask(taskId, { 
+          status: 'failed',
+          elapsed_seconds: finalElapsed
+        }, sessionId);
+        await taskStore.addLog(taskId, `[TASK_FAILED] ${result.error || 'Unknown error'}`, sessionId);
+      }
+    } catch (error) {
+      clearInterval(updateElapsedTime);
+      throw error;
+    }
     
     return result;
   } catch (cmdError) {

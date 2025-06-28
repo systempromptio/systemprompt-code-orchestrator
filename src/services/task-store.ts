@@ -16,8 +16,10 @@ export interface Task {
   status: "pending" | "in_progress" | "completed" | "failed" | "cancelled";
   created_at: string;
   updated_at: string;
+  started_at?: string;
+  completed_at?: string;
   assigned_to: string | null;
-  progress: number;
+  elapsed_seconds: number;
   logs: string[];
   result?: any;
   error?: any;
@@ -170,16 +172,16 @@ export class TaskStore extends EventEmitter {
     }
   }
   
-  async updateProgress(taskId: string, progress: number): Promise<void> {
+  async updateElapsedTime(taskId: string, elapsedSeconds: number, sessionId?: string): Promise<void> {
     const task = this.tasks.get(taskId);
     if (task) {
-      task.progress = Math.min(100, Math.max(0, progress));
+      task.elapsed_seconds = elapsedSeconds;
       task.updated_at = new Date().toISOString();
       await this.persistence.saveTask(task);
-      this.emit('task:progress', { taskId, progress: task.progress });
+      this.emit('task:progress', { taskId, elapsed_seconds: task.elapsed_seconds });
       
       // Send MCP notification for progress update
-      await sendResourcesUpdatedNotification(`task://${taskId}`);
+      await sendResourcesUpdatedNotification(`task://${taskId}`, sessionId);
     }
   }
 

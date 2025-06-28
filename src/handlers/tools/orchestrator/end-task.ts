@@ -82,7 +82,7 @@ export const handleEndTask: ToolHandler<EndTaskArgs> = async (args) => {
     
     await taskStore.updateTask(validated.task_id, {
       status: validated.status,
-      progress: validated.status === 'completed' ? 100 : task.progress,
+      completed_at: validated.status === 'completed' ? new Date().toISOString() : undefined,
       result: finalResult,
       logs: [`Task ended with status: ${validated.status}`]
     });

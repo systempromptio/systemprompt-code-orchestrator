@@ -46,7 +46,7 @@ export async function getTaskOutputResource(uri: URL): Promise<Resource> {
         title: task.title,
         status: task.status,
         branch: task.branch,
-        progress: task.progress || 0,
+        elapsed_seconds: task.elapsed_seconds || 0,
         created_at: task.created_at,
         updated_at: task.updated_at
       },

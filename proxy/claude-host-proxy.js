@@ -98,48 +98,50 @@ function handleConnection(socket) {
       log(`[Claude Host Proxy] Executing command: ${command}`);
       
       try {
-        // Use execFile with shell to handle the script execution
+        // Use spawn with shell to handle the script execution and get streaming output
         const options = {
           cwd: message.workingDirectory || process.cwd(),
           env: process.env,
-          maxBuffer: 10 * 1024 * 1024 // 10MB buffer
-          // Remove stdio option to use default ['pipe', 'pipe', 'pipe']
+          shell: shellPath,
+          stdio: ['pipe', 'pipe', 'pipe']
         };
         
-        log(`[Claude Host Proxy] ExecFile options:`, JSON.stringify({
+        log(`[Claude Host Proxy] Spawn options:`, JSON.stringify({
           cwd: options.cwd,
+          shell: options.shell,
           envKeys: Object.keys(options.env).filter(k => k.includes('CLAUDE') || k.includes('SHELL'))
         }));
         
-        // Use callback form to ensure proper error handling
-        currentProcess = execFile(shellPath, ['-c', command], options, (error, stdout, stderr) => {
-          if (error) {
-            log(`[Claude Host Proxy] ExecFile callback error: ${error.message}`);
-            log(`[Claude Host Proxy] Error code: ${error.code}, signal: ${error.signal}`);
-            
-            const errorResponse = {
-              type: 'error',
-              data: `Failed to execute Claude: ${error.message}`
-            };
-            
-            if (socket.writable) {
-              socket.write(JSON.stringify(errorResponse) + '\n');
-            }
-          } else {
-            log(`[Claude Host Proxy] ExecFile callback success`);
-            log(`[Claude Host Proxy] Stdout length: ${stdout.length}`);
-            log(`[Claude Host Proxy] Stderr length: ${stderr.length}`);
-          }
-        });
+        // Use spawn to get immediate access to stdout/stderr streams
+        currentProcess = spawn(command, [], options);
         
-        log(`[Claude Host Proxy] ExecFile returned, PID: ${currentProcess.pid}`);
+        log(`[Claude Host Proxy] Spawned process with PID: ${currentProcess.pid}`);
       } catch (spawnError) {
-        log(`[Claude Host Proxy] ExecFile failed immediately: ${spawnError.message}`);
+        log(`[Claude Host Proxy] Spawn failed immediately: ${spawnError.message}`);
         log(`[Claude Host Proxy] Error stack:`, spawnError.stack);
-        throw spawnError;
+        
+        const errorResponse = {
+          type: 'error',
+          data: `Failed to spawn Claude: ${spawnError.message}`
+        };
+        
+        if (socket.writable) {
+          socket.write(JSON.stringify(errorResponse) + '\n');
+        }
+        return;
       }
       
       log(`[Claude Host Proxy] Spawned Claude process with PID: ${currentProcess.pid}`);
+      log(`[Claude Host Proxy] Process stdout available: ${!!currentProcess.stdout}`);
+      log(`[Claude Host Proxy] Process stderr available: ${!!currentProcess.stderr}`);
+      log(`[Claude Host Proxy] Process stdin available: ${!!currentProcess.stdin}`);
+      
+      // Close stdin immediately since we're not sending any input
+      // This tells Claude that there's no more input coming
+      if (currentProcess.stdin) {
+        log(`[Claude Host Proxy] Closing stdin to signal no more input`);
+        currentProcess.stdin.end();
+      }
       
       // Handle execFile callback for completion
       currentProcess.on('exit', (code) => {
@@ -148,10 +150,12 @@ function handleConnection(socket) {
       
       // Stream stdout directly to socket
       if (currentProcess.stdout) {
+        log(`[Claude Host Proxy] Setting up stdout handler`);
         currentProcess.stdout.on('data', (chunk) => {
           const data = chunk.toString();
           log(`[Claude Host Proxy] Streaming stdout chunk (${chunk.length} bytes)`);
           log(`[Claude Host Proxy] Socket writable: ${socket.writable}`);
+          log(`[Claude Host Proxy] Socket destroyed: ${socket.destroyed}`);
           log(`[Claude Host Proxy] First 100 chars: ${data.substring(0, 100)}`);
           
           // Wrap each chunk in a streaming response
@@ -160,19 +164,27 @@ function handleConnection(socket) {
             data: data
           };
           
-          if (socket.writable) {
+          if (socket.writable && !socket.destroyed) {
             socket.write(JSON.stringify(streamResponse) + '\n');
             log(`[Claude Host Proxy] Data sent to client`);
           } else {
             log(`[Claude Host Proxy] Socket not writable - data lost!`);
           }
         });
+        
+        // Also listen for end event
+        currentProcess.stdout.on('end', () => {
+          log(`[Claude Host Proxy] stdout stream ended`);
+        });
+      } else {
+        log(`[Claude Host Proxy] WARNING: No stdout stream available on process`);
       }
       
       // Stream stderr as error messages
-      currentProcess.stderr.on('data', (chunk) => {
-        const data = chunk.toString();
-        log(`[Claude Host Proxy] stderr: ${data}`);
+      if (currentProcess.stderr) {
+        currentProcess.stderr.on('data', (chunk) => {
+          const data = chunk.toString();
+          log(`[Claude Host Proxy] stderr: ${data}`);
         
         const errorResponse = {
           type: 'error',
@@ -216,6 +228,7 @@ function handleConnection(socket) {
         currentProcess = null;
       });
       
+    } // End of outer try block
     } catch (e) {
       // Wait for more data if JSON is incomplete
       if (buffer.length > 10000) {

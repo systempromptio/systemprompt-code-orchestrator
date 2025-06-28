@@ -224,7 +224,7 @@ export class AgentManager extends EventEmitter {
         const output = await this.claudeService.querySync(
           session.serviceSessionId, 
           command.command,
-          { maxTurns: 1 }
+          { maxTurns: 30 } // Allow Claude to use multiple turns for complex tasks
         );
         const duration = Date.now() - startTime;
         
