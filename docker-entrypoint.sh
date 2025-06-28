@@ -35,7 +35,10 @@ echo "- Projects Path: $PROJECTS_PATH"
 # Configure Git to trust the workspace directory
 if [ -d "/workspace/.git" ]; then
     echo "Configuring Git safe directory..."
-    git config --global --add safe.directory /workspace
+    # Use system config if we can't write to user config
+    git config --system --add safe.directory /workspace 2>/dev/null || \
+    git config --global --add safe.directory /workspace 2>/dev/null || \
+    echo "Warning: Could not configure Git safe directory"
 fi
 
 # Execute the main command

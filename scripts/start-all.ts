@@ -10,13 +10,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
+import * as net from 'net';
 
 const execAsync = promisify(exec);
 
 // Get __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.join(__dirname, '..');
+const projectRoot = path.resolve(__dirname, '..', '..');
 
 // Types
 interface ValidatedEnvironment {
@@ -209,13 +210,14 @@ class StartupManager {
     };
     
     const logFile = path.join(this.logDir, 'host-bridge.log');
-    const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+    const out = fs.openSync(logFile, 'a');
+    const err = fs.openSync(logFile, 'a');
     
     this.proxyProcess = spawn('node', ['dist/host-bridge-daemon.js'], {
       cwd: path.join(projectRoot, 'daemon'),
       env: proxyEnv,
       detached: true,
-      stdio: ['ignore', logStream, logStream]
+      stdio: ['ignore', out, err]
     });
     
     if (!this.proxyProcess) {
@@ -266,7 +268,6 @@ class StartupManager {
   
   private isPortOpen(port: number): Promise<boolean> {
     return new Promise((resolve) => {
-      const net = require('net');
       const client = new net.Socket();
       
       client.setTimeout(1000);
@@ -286,6 +287,70 @@ class StartupManager {
       
       client.connect(port, 'localhost');
     });
+  }
+  
+  private async performPreChecks(env: ValidatedEnvironment): Promise<boolean> {
+    this.log('\n==== Pre-flight Checks ====\n', colors.blue);
+    let allChecksPass = true;
+    
+    // Check if daemon build exists
+    const daemonPath = path.join(projectRoot, 'daemon', 'dist', 'host-bridge-daemon.js');
+    this.info(`Checking for daemon at: ${daemonPath}`);
+    if (!fs.existsSync(daemonPath)) {
+      this.warning('Daemon not built yet - will build during startup');
+    } else {
+      this.success('Daemon build found');
+    }
+    
+    // Check if ports are available
+    if (await this.isPortOpen(parseInt(env.CLAUDE_PROXY_PORT))) {
+      this.error(`Port ${env.CLAUDE_PROXY_PORT} is already in use`);
+      const pidFile = path.join(this.logDir, 'daemon.pid');
+      if (fs.existsSync(pidFile)) {
+        const pid = fs.readFileSync(pidFile, 'utf-8').trim();
+        this.info(`  Found daemon PID file with PID: ${pid}`);
+        this.info(`  Run "npm run stop" to stop existing services`);
+      }
+      allChecksPass = false;
+    } else {
+      this.success(`Port ${env.CLAUDE_PROXY_PORT} is available`);
+    }
+    
+    if (await this.isPortOpen(parseInt(env.MCP_PORT))) {
+      this.warning(`Port ${env.MCP_PORT} is in use (likely Docker services already running)`);
+    } else {
+      this.success(`Port ${env.MCP_PORT} is available`);
+    }
+    
+    // Check Docker daemon
+    try {
+      await execAsync('docker info', { timeout: 5000 });
+      this.success('Docker daemon is running');
+    } catch {
+      this.error('Docker daemon is not running');
+      this.info('  Start Docker Desktop or run: sudo systemctl start docker');
+      allChecksPass = false;
+    }
+    
+    // Check if we need to set up Claude
+    if (env.CLAUDE_AVAILABLE === 'false') {
+      this.warning('Claude CLI not configured');
+      this.info('  The daemon will start but won\'t be able to execute Claude commands');
+      this.info('  To enable Claude: export CLAUDE_PATH=$(which claude)');
+    }
+    
+    // Check write permissions
+    try {
+      const testFile = path.join(this.logDir, '.test-write');
+      fs.writeFileSync(testFile, 'test');
+      fs.unlinkSync(testFile);
+      this.success('Write permissions verified');
+    } catch {
+      this.error('No write permissions in logs directory');
+      allChecksPass = false;
+    }
+    
+    return allChecksPass;
   }
   
   async startDocker(env: ValidatedEnvironment): Promise<boolean> {
@@ -327,6 +392,15 @@ class StartupManager {
       
       if (env.errors.length > 0) {
         this.error('\nCannot start due to validation errors');
+        this.error('\nPlease fix the following issues:');
+        env.errors.forEach(err => this.error(`  • ${err}`));
+        this.info('\nRun "npm run setup" to configure your environment');
+        process.exit(1);
+      }
+      
+      // Additional pre-checks
+      if (!await this.performPreChecks(env)) {
+        this.error('\nPre-flight checks failed. Cannot continue.');
         process.exit(1);
       }
       
