@@ -40,7 +40,7 @@ Leverages every MCP feature: persistent state management, real-time notification
 
 ## 🚨 Security Notice
 
-**⚠️ CRITICAL: This server grants AI agents full access to your local machine with NO built-in authentication.**
+**⚠️ CRITICAL: This server grants AI agents full access to your local machine with NO built-in authentication. (yet)**
 
 ### Security Implications
 

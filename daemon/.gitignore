@@ -1,0 +1,24 @@
+# Daemon build output
+dist/
+build/
+
+# Daemon logs
+logs/
+
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
