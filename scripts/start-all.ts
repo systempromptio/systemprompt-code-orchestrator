@@ -5,10 +5,13 @@
  * Validates environment, starts proxy, and launches Docker with validated env
  */
 
-import { spawn, ChildProcess } from 'child_process';
+import { ChildProcess, spawn, exec } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 // Get __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -154,16 +157,20 @@ class StartupManager {
   
   private async findCommand(command: string): Promise<string | null> {
     return new Promise((resolve) => {
-      const which = spawn('which', [command], { shell: true });
+      const isWindows = process.platform === 'win32';
+      const shellCommand = isWindows ? 'where' : 'which';
+      const which = spawn(shellCommand, [command], { shell: isWindows });
       let output = '';
       
-      which.stdout.on('data', (data) => {
+      which.stdout.on('data', (data: Buffer) => {
         output += data.toString();
       });
       
-      which.on('close', (code) => {
+      which.on('close', (code: number | null) => {
         if (code === 0 && output.trim()) {
-          resolve(output.trim());
+          // On Windows, 'where' might return multiple lines
+          const firstLine = output.trim().split('\n')[0].trim();
+          resolve(firstLine);
         } else {
           resolve(null);
         }
@@ -174,23 +181,17 @@ class StartupManager {
   async buildDaemon(): Promise<boolean> {
     this.log('\n==== Building Daemon ====\n', colors.blue);
     
-    return new Promise((resolve) => {
-      const build = spawn('npm', ['run', 'build'], {
+    try {
+      await execAsync('npm run build', {
         cwd: path.join(projectRoot, 'daemon'),
-        stdio: 'inherit',
-        shell: true
+        shell: '/bin/bash'
       });
-      
-      build.on('close', (code) => {
-        if (code === 0) {
-          this.success('Daemon built successfully');
-          resolve(true);
-        } else {
-          this.error('Failed to build daemon');
-          resolve(false);
-        }
-      });
-    });
+      this.success('Daemon built successfully');
+      return true;
+    } catch (error) {
+      this.error(`Failed to build daemon: ${error}`);
+      return false;
+    }
   }
   
   async startProxy(env: ValidatedEnvironment): Promise<boolean> {
@@ -214,15 +215,20 @@ class StartupManager {
       cwd: path.join(projectRoot, 'daemon'),
       env: proxyEnv,
       detached: true,
-      stdio: ['ignore', logStream, logStream],
-      shell: true
+      stdio: ['ignore', logStream, logStream]
     });
+    
+    if (!this.proxyProcess) {
+      this.error('Failed to spawn proxy process');
+      return false;
+    }
     
     // Save PID
     const pidFile = path.join(this.logDir, 'proxy.pid');
-    fs.writeFileSync(pidFile, this.proxyProcess.pid!.toString());
-    
-    this.info(`Proxy started with PID: ${this.proxyProcess.pid}`);
+    if (this.proxyProcess.pid) {
+      fs.writeFileSync(pidFile, this.proxyProcess.pid.toString());
+      this.info(`Proxy started with PID: ${this.proxyProcess.pid}`);
+    }
     this.info(`Log file: ${logFile}`);
     
     // Wait for proxy to be ready
@@ -300,24 +306,18 @@ class StartupManager {
     
     fs.writeFileSync(path.join(projectRoot, '.env'), envContent);
     
-    return new Promise((resolve) => {
-      this.dockerProcess = spawn('docker-compose', ['up', '-d'], {
+    try {
+      await execAsync('docker-compose up -d', {
         cwd: projectRoot,
-        stdio: 'inherit',
         env: dockerEnv,
-        shell: true
+        shell: '/bin/bash'
       });
-      
-      this.dockerProcess.on('close', (code) => {
-        if (code === 0) {
-          this.success('Docker services started');
-          resolve(true);
-        } else {
-          this.error('Failed to start Docker services');
-          resolve(false);
-        }
-      });
-    });
+      this.success('Docker services started');
+      return true;
+    } catch (error) {
+      this.error(`Failed to start Docker services: ${error}`);
+      return false;
+    }
   }
   
   async start(): Promise<void> {
@@ -331,9 +331,16 @@ class StartupManager {
       }
       
       // Build daemon
-      if (!await this.buildDaemon()) {
-        this.error('Failed to build daemon');
-        process.exit(1);
+      const daemonBuilt = await this.buildDaemon();
+      if (!daemonBuilt) {
+        this.warning('Failed to build daemon, attempting to continue...');
+        // Check if daemon is already built
+        const daemonPath = path.join(projectRoot, 'daemon', 'dist', 'host-bridge-daemon.js');
+        if (!fs.existsSync(daemonPath)) {
+          this.error('Daemon not built and build failed. Cannot continue.');
+          process.exit(1);
+        }
+        this.info('Using existing daemon build');
       }
       
       // Start proxy

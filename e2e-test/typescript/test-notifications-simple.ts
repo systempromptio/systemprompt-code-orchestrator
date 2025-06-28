@@ -126,7 +126,6 @@ async function testBasicNotifications(client: Client): Promise<void> {
  * Test notification error handling
  */
 async function testNotificationErrorHandling(client: Client): Promise<void> {
-  let errorCaught = false;
   
   // Set up notification handler that throws an error
   client.setNotificationHandler(ResourceListChangedNotificationSchema, () => {
@@ -138,7 +137,6 @@ async function testNotificationErrorHandling(client: Client): Promise<void> {
     await client.listResources();
     await sleep(1000); // Wait for any async notifications
   } catch (error) {
-    errorCaught = true;
     log.debug('Caught error from notification handler');
   }
   

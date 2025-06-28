@@ -53,7 +53,7 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
       try {
         const taskResource = await client.readResource({ uri: notification.params.uri });
         if (taskResource.contents?.[0]?.text) {
-          const taskInfo = JSON.parse(taskResource.contents[0].text);
+          const taskInfo = JSON.parse(taskResource.contents[0].text as string);
           log.info(`  📊 Task Status: ${taskInfo.status}, Progress: ${taskInfo.progress}%`);
           
           // Show recent logs
@@ -95,7 +95,7 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
   
   let taskData;
   try {
-    taskData = JSON.parse(content[0].text);
+    taskData = JSON.parse(content[0].text as string);
   } catch (e) {
     throw new Error(`Failed to parse create_task response: ${content[0].text}`);
   }
@@ -128,7 +128,7 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
   try {
     const taskResource = await client.readResource({ uri: taskUri });
     if (taskResource.contents?.[0]?.text) {
-      const taskInfo = JSON.parse(taskResource.contents[0].text);
+      const taskInfo = JSON.parse(taskResource.contents[0].text as string);
       log.info(`📋 Initial Task State:`);
       log.info(`  Title: ${taskInfo.title}`);
       log.info(`  Status: ${taskInfo.status}`);
@@ -159,7 +159,7 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
       
       const updateContent = updateResult.content as any[];
       if (updateContent?.[0]?.text) {
-        const updateData = JSON.parse(updateContent[0].text);
+        const updateData = JSON.parse(updateContent[0].text as string);
         log.debug(`Additional instructions sent: ${updateData.message || 'success'}`);
       }
     } catch (error) {
@@ -193,7 +193,7 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
     const finalStatus = await client.readResource({ uri: taskUri });
     
     if (finalStatus.contents?.[0]?.text) {
-      const final = JSON.parse(finalStatus.contents[0].text);
+      const final = JSON.parse(finalStatus.contents[0].text as string);
       log.info(`Status: ${final.status}`);
       log.info(`Progress: ${final.progress}%`);
       log.info(`Total logs: ${final.logs?.length || 0}`);
@@ -212,7 +212,7 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
         const outputResource = await client.readResource({ uri: outputUri });
         
         if (outputResource.contents?.[0]?.text) {
-          const output = JSON.parse(outputResource.contents[0].text);
+          const output = JSON.parse(outputResource.contents[0].text as string);
           log.section('📝 Task Output');
           log.info(`Files created: ${output.files?.length || 0}`);
           if (output.files && output.files.length > 0) {

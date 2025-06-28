@@ -30,10 +30,11 @@ async function stopDocker(): Promise<void> {
   return new Promise((resolve) => {
     const docker = spawn('docker-compose', ['down'], {
       cwd: projectRoot,
-      stdio: 'inherit'
+      stdio: 'inherit',
+      shell: true
     });
     
-    docker.on('close', (code) => {
+    docker.on('close', (code: number | null) => {
       if (code === 0) {
         log('✓ Docker services stopped', colors.green);
       } else {

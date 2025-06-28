@@ -44,7 +44,7 @@ Make sure all files are properly formatted and include error handling.`,
     });
     
     const content = createResult.content as any[];
-    const taskData = JSON.parse(content[0].text);
+    const taskData = JSON.parse(content[0].text as string);
     const taskId = taskData.result.task_id;
     
     log.info(`Task created: ${taskId}`);
@@ -63,7 +63,7 @@ Make sure all files are properly formatted and include error handling.`,
       
       try {
         const taskResource = await client.readResource({ uri: `task://${taskId}` });
-        const task = JSON.parse(taskResource.contents[0].text);
+        const task = JSON.parse(taskResource.contents[0].text as string);
         
         // Show new logs
         if (task.logs && task.logs.length > lastLogCount) {
@@ -93,7 +93,7 @@ Make sure all files are properly formatted and include error handling.`,
           // Try to get task output
           try {
             const outputResource = await client.readResource({ uri: `task-output://${taskId}` });
-            const output = JSON.parse(outputResource.contents[0].text);
+            const output = JSON.parse(outputResource.contents[0].text as string);
             log.section('📄 Task Output');
             log.info(`Files created: ${output.files?.length || 0}`);
             if (output.files) {

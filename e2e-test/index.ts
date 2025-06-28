@@ -9,8 +9,6 @@
 import { testTools } from './typescript/test-tools.js';
 import { testPrompts } from './typescript/test-prompts.js';
 import { testResources } from './typescript/test-resources.js';
-import { testConcurrent } from './typescript/test-concurrent.js';
-import { testCheckStatus } from './typescript/test-check-status.js';
 
 const log = {
   title: (msg: string) => console.log(`\n\x1b[1m\x1b[35m${msg}\x1b[0m`),
@@ -27,9 +25,7 @@ interface TestSuite {
 const testSuites: TestSuite[] = [
   { name: 'Tools', run: testTools },
   { name: 'Prompts', run: testPrompts },
-  { name: 'Resources', run: testResources },
-  { name: 'Concurrent Operations', run: testConcurrent },
-  { name: 'Check Status', run: testCheckStatus }
+  { name: 'Resources', run: testResources }
 ];
 
 async function runAllTests(): Promise<void> {

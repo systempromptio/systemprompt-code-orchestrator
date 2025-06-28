@@ -110,7 +110,6 @@ export async function testTools(): Promise<void> {
   
   const tracker = new TestTracker();
   let client: Client | null = null;
-  let testTaskId: string | null = null;
   
   try {
     client = await createMCPClient();
@@ -120,7 +119,7 @@ export async function testTools(): Promise<void> {
     
     // Create a task to verify basic functionality
     await runTest('Create Task', async () => {
-      testTaskId = await testCreateTask(client!);
+      await testCreateTask(client!);
     }, tracker);
     
     await runTest('Error Handling', () => testErrorHandling(client!), tracker);

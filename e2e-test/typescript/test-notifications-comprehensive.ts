@@ -218,13 +218,13 @@ async function testSubscriptionPatterns(client: Client): Promise<void> {
   const notifications: string[] = [];
   
   // Handler 1
-  const handler1 = (notification: any) => {
+  const handler1 = (_notification: any) => {
     notifications.push('handler1');
     log.debug('Handler 1 called');
   };
   
   // Handler 2 (will replace handler 1)
-  const handler2 = (notification: any) => {
+  const handler2 = (_notification: any) => {
     notifications.push('handler2');
     log.debug('Handler 2 called');
   };

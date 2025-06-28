@@ -32,35 +32,6 @@ Control your AI coding agents from anywhere with our native mobile apps:
 
 Your support helps us continue creating valuable **free and open source** tools for the AI community!
 
-## 🚨 CRITICAL SECURITY WARNING 🚨
-
-**THIS SERVER EXPOSES YOUR LOCAL MACHINE TO THE INTERNET WITH NO BUILT-IN AUTHENTICATION**
-
-### ⚠️ Security Risks
-
-1. **Full System Access**: This server provides AI agents with complete access to your `PROJECT_ROOT` directory
-2. **No Authentication**: Currently ships with **NO authentication mechanism** out of the box
-3. **Remote Code Execution**: AI agents can execute arbitrary code on your machine
-4. **Sensitive Data Exposure**: Any files in your project directory can be read/modified
-
-### 🔒 Security Best Practices
-
-**USE AT YOUR OWN RISK** - Follow these guidelines:
-
-1. **Never expose to public internet** without proper authentication
-2. **Treat any public URL as EXTREMELY SENSITIVE** - anyone with the URL has full access
-3. **Use VPN or secure tunnels** for remote access
-4. **Restrict `PROJECT_ROOT`** to non-sensitive directories only
-5. **Monitor all agent activities** through logs and notifications
-6. **Use read-only mounts** where possible
-7. **Implement network-level security** (firewalls, IP whitelisting)
-
-### 🔐 Coming Soon: Zero-Trust OAuth
-
-We are actively developing a **zero-trust OAuth flow** that will be incorporated in the next major release. Until then, this server should be considered **experimental** and used only in controlled environments.
-
----
-
 ## 🌟 Why Another Agent Orchestrator?
 
 ### 1. 🌐 **Remote Endpoint Infrastructure**
@@ -104,8 +75,33 @@ Specifically designed for use with the **SystemPrompt Native Mobile client**. Or
 - **Extensible**: Easy to add new AI agents or tools
 - **Well-Documented**: Extensive inline documentation
 
+## 🚨 SECURITY WARNING 🚨
+
+**THIS SERVER EXPOSES YOUR LOCAL MACHINE TO THE INTERNET WITH NO BUILT-IN AUTHENTICATION**
+
+### ⚠️ Security Risks
+
+1. **Full System Access**: This server provides AI agents with access to your local machine
+2. **No Authentication**: Currently ships with **NO authentication mechanism** out of the box (URLS MUST REMAIN PRIVATE, and only open when used)
+3. **Remote Code Execution**: AI agents can execute arbitrary code on your machine
+4. **Sensitive Data Exposure**: Any files in your project directory can be read/modified
+
+### 🔒 Security Best Practices
+
+**USE AT YOUR OWN RISK** - Follow these guidelines:
+
+1. **Treat any public URL as EXTREMELY SENSITIVE** - anyone with the URL has full access
+2. **Monitor all agent activities** through logs and notifications
+
+### 🔐 Coming Soon: Zero-Trust OAuth
+
+We are actively developing a **zero-trust OAuth flow** that will be incorporated in the next major release. Until then, this server should be considered **experimental** and used only in controlled environments.
+
+
+
 ## 📚 Table of Contents
 
+- [Why Another Agent Orchestrator?](#-why-another-agent-orchestrator)
 - [Security Warning](#-critical-security-warning-)
 - [Features](#-features)
 - [Quick Start](#-quick-start)
