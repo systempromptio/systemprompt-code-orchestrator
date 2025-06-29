@@ -34,16 +34,11 @@ export const ReportTaskArgsSchema = z.object({
 export type ReportTaskArgs = z.infer<typeof ReportTaskArgsSchema>;
 
 export const CleanStateArgsSchema = z.object({
-  keep_recent: z.boolean().default(true),
-  hours: z.number().positive().default(24),
-  dry_run: z.boolean().default(false)
+  task_id: z.string().optional().describe('Optional task ID to delete. If not provided, deletes all tasks.')
 });
 export type CleanStateArgs = z.infer<typeof CleanStateArgsSchema>;
 
-export const CheckStatusArgsSchema = z.object({
-  verbose: z.boolean().default(false),
-  include_tasks: z.boolean().default(false)
-});
+export const CheckStatusArgsSchema = z.object({});
 export type CheckStatusArgs = z.infer<typeof CheckStatusArgsSchema>;
 
 // ==================== Response Types ====================

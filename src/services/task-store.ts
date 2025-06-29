@@ -176,8 +176,10 @@ export class TaskStore extends EventEmitter {
     const task = this.tasks.get(taskId);
     if (task) {
       this.tasks.delete(taskId);
+      await this.persistence.deleteTask(taskId);
       await this.persistState();
       this.emit("task:deleted", { taskId });
+      await sendResourcesListChangedNotification();
     }
   }
 

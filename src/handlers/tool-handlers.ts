@@ -12,7 +12,16 @@ import type {
 import { z } from 'zod';
 import { TOOLS } from '../constants/tools.js';
 import { logger } from '../utils/logger.js';
+import { jsonSchemaToZod } from '../utils/json-schema-to-zod.js';
 import type { MCPToolContext } from '../types/request-context.js';
+
+// Import tool definitions for schema extraction
+import { createTask } from '../constants/tool/orchestrator/create-task.js';
+import { updateTask } from '../constants/tool/orchestrator/update-task.js';
+import { endTask } from '../constants/tool/orchestrator/end-task.js';
+import { reportTask } from '../constants/tool/orchestrator/report-task.js';
+import { checkStatus } from '../constants/tool/orchestrator/check-status.js';
+import { cleanState } from '../constants/tool/orchestrator/clean-state.js';
 
 // Import tool handlers
 import { handleCreateTask } from './tools/orchestrator/create-task.js';
@@ -23,68 +32,15 @@ import { handleCheckStatus } from './tools/orchestrator/check-status.js';
 import { handleCleanState } from './tools/orchestrator/clean-state.js';
 
 /**
- * Zod schemas for tool validation
+ * Zod schemas derived from tool definitions
  */
 const ToolSchemas = {
-  create_task: z.object({
-    title: z.string(),
-    tool: z.enum(["CLAUDECODE", "GEMINICLI"]),
-    instructions: z.string(),
-    branch: z.string()
-  }),
-  
-  update_task: z.object({
-    task_id: z.string(),
-    command: z.string().optional(),
-    update: z.object({
-      status: z.enum(["pending", "in_progress", "completed", "failed", "cancelled"]).optional(),
-      progress: z.number().min(0).max(100).optional(),
-      add_requirement: z.string().optional(),
-      add_log: z.string().optional(),
-      priority: z.enum(["low", "medium", "high", "critical"]).optional()
-    }).optional(),
-    context: z.object({
-      add_files: z.array(z.string()).optional(),
-      shell_command: z.string().optional(),
-      wait_for_completion: z.boolean().default(true),
-      timeout: z.number().default(300000)
-    }).optional()
-  }),
-  
-  end_task: z.object({
-    task_id: z.string(),
-    final_command: z.string().optional(),
-    status: z.enum(["completed", "failed", "cancelled"]).default("completed"),
-    summary: z.string().optional(),
-    result: z.any().optional(),
-    generate_report: z.boolean().default(true),
-    cleanup: z.object({
-      save_session_logs: z.boolean().default(true),
-      save_code_changes: z.boolean().default(true),
-      compress_context: z.boolean().default(false)
-    }).optional()
-  }),
-  
-  report: z.object({
-    id: z.string().optional()
-  }),
-  
-  check_status: z.object({
-    test_sessions: z.boolean().default(true),
-    verbose: z.boolean().default(false),
-    include_tasks: z.boolean().default(true),
-    include_sessions: z.boolean().default(true),
-    include_tools: z.boolean().default(true),
-    include_resources: z.boolean().default(true)
-  }),
-  
-  clean_state: z.object({
-    clean_tasks: z.boolean().default(true),
-    clean_sessions: z.boolean().default(true),
-    keep_recent: z.boolean().default(true),
-    force: z.boolean().default(false),
-    dry_run: z.boolean().default(false)
-  })
+  create_task: jsonSchemaToZod(createTask.inputSchema),
+  update_task: jsonSchemaToZod(updateTask.inputSchema),
+  end_task: jsonSchemaToZod(endTask.inputSchema),
+  report: jsonSchemaToZod(reportTask.inputSchema),
+  check_status: jsonSchemaToZod(checkStatus.inputSchema),
+  clean_state: jsonSchemaToZod(cleanState.inputSchema)
 };
 
 /**

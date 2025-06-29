@@ -238,6 +238,21 @@ export class StatePersistence extends EventEmitter {
     this.emit('autosave:triggered');
   }
   
+  async deleteTask(taskId: string): Promise<void> {
+    if (this.config.type === 'filesystem') {
+      const taskFile = path.join(this.statePath, 'tasks', `task_${taskId}.json`);
+      
+      try {
+        await fs.unlink(taskFile);
+        console.log(`Deleted task file: task_${taskId}.json`);
+      } catch (error: any) {
+        if (error.code !== 'ENOENT') {
+          console.error(`Failed to delete task ${taskId}:`, error);
+        }
+      }
+    }
+  }
+  
   async shutdown(): Promise<void> {
     if (this.saveInterval) {
       clearInterval(this.saveInterval);
