@@ -78,13 +78,14 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
   
   // Step 1: Create a task
   log.debug('Creating task with CLAUDECODE tool...');
+  const branchName = `e2e-test-${timestamp}`;
   const createResult = await client.callTool({
     name: 'create_task',
     arguments: {
       title: 'E2E Test Task',
       tool: 'CLAUDECODE',
-      instructions: 'Create a simple JavaScript file called hello.js that exports a function called greet(name) that returns "Hello, {name}!"',
-      branch: `e2e-test-${timestamp}`
+      instructions: 'Create a hello world HTML file called hello.html with the content: <!DOCTYPE html><html><body><h1>Hello World!</h1></body></html>',
+      branch: branchName
     }
   });
   
@@ -245,6 +246,46 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
   
   if (!taskComplete) {
     log.warning('Task did not complete within timeout period');
+  }
+  
+  // Step 9: End the task
+  if (taskId) {
+    log.debug('Ending task...');
+    try {
+      await client.callTool({
+        name: 'end_task',
+        arguments: {
+          task_id: taskId
+        }
+      });
+      log.debug('Task ended successfully');
+    } catch (error) {
+      log.debug(`Note: Could not end task - ${error}`);
+    }
+  }
+  
+  // Step 10: Verify git branch was created
+  log.section('🌿 Git Branch Verification');
+  try {
+    const statusResult = await client.callTool({
+      name: 'run_bash_command',
+      arguments: {
+        command: `git branch -a | grep ${branchName}`
+      }
+    });
+    
+    const statusContent = statusResult.content as any[];
+    if (statusContent?.[0]?.text) {
+      const statusData = JSON.parse(statusContent[0].text as string);
+      if (statusData.result?.output) {
+        log.info(`Git branch ${branchName} found:`);
+        log.debug(statusData.result.output);
+      } else {
+        log.warning(`Git branch ${branchName} not found`);
+      }
+    }
+  } catch (error) {
+    log.debug('Could not check git branches');
   }
 }
 

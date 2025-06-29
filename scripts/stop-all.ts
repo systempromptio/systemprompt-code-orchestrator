@@ -45,21 +45,25 @@ async function stopDocker(): Promise<void> {
   });
 }
 
-async function stopProxy(): Promise<void> {
-  log('Stopping proxy...', colors.blue);
+async function stopDaemon(): Promise<void> {
+  log('Stopping daemon...', colors.blue);
   
-  const pidFile = path.join(projectRoot, 'logs', 'proxy.pid');
+  // Check in the daemon logs directory
+  const pidFile = path.join(projectRoot, 'daemon', 'logs', 'daemon.pid');
+  
   if (fs.existsSync(pidFile)) {
     const pid = parseInt(fs.readFileSync(pidFile, 'utf-8'));
     try {
       process.kill(pid, 'SIGTERM');
-      log(`✓ Proxy stopped (PID: ${pid})`, colors.green);
+      log(`✓ Daemon stopped (PID: ${pid})`, colors.green);
       fs.unlinkSync(pidFile);
     } catch (e) {
-      log('⚠ Proxy was not running', colors.red);
+      // Process doesn't exist, remove stale PID file
+      fs.unlinkSync(pidFile);
+      log('⚠ Daemon was not running (stale PID file removed)', colors.red);
     }
   } else {
-    log('ℹ No proxy PID file found', colors.blue);
+    log('⚠ Daemon was not running', colors.red);
   }
 }
 
@@ -67,7 +71,7 @@ async function main(): Promise<void> {
   log('\n==== Stopping All Services ====\n', colors.blue);
   
   await stopDocker();
-  await stopProxy();
+  await stopDaemon();
   
   log('\n✓ All services stopped\n', colors.green);
 }

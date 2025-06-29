@@ -1,5 +1,7 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
+export type { CallToolResult };
+
 // Context passed to individual tool handlers
 export interface ToolHandlerContext {
   userId?: string;

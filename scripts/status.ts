@@ -52,7 +52,7 @@ class SystemStatus {
   checkDaemonStatus(): { running: boolean; pid?: number; port?: number } {
     this.header('Host Bridge Daemon Status');
     
-    const pidFile = path.join(projectRoot, 'logs', 'daemon.pid');
+    const pidFile = path.join(projectRoot, 'daemon', 'logs', 'daemon.pid');
     
     if (!fs.existsSync(pidFile)) {
       this.error('Daemon is not running (no PID file)');
@@ -73,7 +73,7 @@ class SystemStatus {
           this.success('Listening on port 9876');
           
           // Check daemon logs
-          const logFile = path.join(projectRoot, 'logs', 'host-bridge.log');
+          const logFile = path.join(projectRoot, 'daemon', 'logs', 'host-bridge.log');
           if (fs.existsSync(logFile)) {
             const stats = fs.statSync(logFile);
             const lastModified = new Date(stats.mtime);

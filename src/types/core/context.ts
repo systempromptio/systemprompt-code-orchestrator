@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { SessionId } from './session';
-import { TaskId } from './task';
+import { TaskId } from '../task';
 
 export interface ExecutionContext {
   readonly sessionId: SessionId;

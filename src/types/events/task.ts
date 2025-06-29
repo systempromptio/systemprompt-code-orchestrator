@@ -1,4 +1,4 @@
-import { Task, TaskStatus, TaskResult, TaskId } from '../core/task';
+import { Task, TaskStatus, TaskResult, TaskId } from '../task';
 import { SessionId } from '../core/session';
 
 export type TaskEventMap = {

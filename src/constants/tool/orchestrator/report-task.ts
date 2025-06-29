@@ -9,27 +9,14 @@ import type { Tool } from '@modelcontextprotocol/sdk/types.js';
  * Tool for generating reports on tasks
  */
 export const reportTask: Tool = {
-  name: 'report_task',
-  description: 'Generate reports on task progress and outcomes. Can report on specific tasks or all tasks.',
+  name: 'report',
+  description: 'Generate a report on task status. Shows all tasks if no ID provided, or details for a specific task.',
   inputSchema: {
     type: 'object',
     properties: {
-      task_ids: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'List of task IDs to report on. If empty, reports on all tasks'
-      },
-      report_type: {
+      id: {
         type: 'string',
-        enum: ['summary', 'detailed', 'progress'],
-        description: 'Type of report to generate',
-        default: 'summary'
-      },
-      format: {
-        type: 'string',
-        enum: ['json', 'markdown'],
-        description: 'Output format for the report',
-        default: 'json'
+        description: 'Optional task ID. If not provided, shows status of all tasks'
       }
     }
   }

@@ -70,8 +70,8 @@ class EnvironmentValidator {
       errors.push('Invalid HOST_BRIDGE_PORT: must be between 1 and 65535');
     }
     
-    // Setup paths
-    const logsDir = path.join(__dirname, '..', '..', 'logs');
+    // Setup paths - use daemon/logs directory
+    const logsDir = path.join(__dirname, '..', 'logs');
     if (!fs.existsSync(logsDir)) {
       fs.mkdirSync(logsDir, { recursive: true });
     }
@@ -255,6 +255,8 @@ class HostBridgeDaemon {
     // Build command args based on tool
     let args: string[] = [];
     
+    let command: string;
+    
     if (message.tool === 'claude') {
       args = [
         '-p',
@@ -263,18 +265,22 @@ class HostBridgeDaemon {
         '--max-turns', '5',
         message.command
       ];
+      command = `${toolPath} ${args.map(arg => `'${arg.replace(/'/g, "'\\''")}'`).join(' ')}`;
+    } else if (message.tool === 'bash') {
+      // For bash, execute the command directly
+      command = message.command;
+      this.logger.log(`[Host Bridge Daemon] Executing bash command: ${command}`);
     } else if (message.tool === 'gemini') {
       // Add Gemini-specific args when needed
       args = [message.command];
+      command = `${toolPath} ${args.map(arg => `'${arg.replace(/'/g, "'\\''")}'`).join(' ')}`;
     } else {
       // Generic command execution
       args = [message.command];
+      command = `${toolPath} ${args.map(arg => `'${arg.replace(/'/g, "'\\''")}'`).join(' ')}`;
     }
     
-    this.logger.log(`[Host Bridge Daemon] Running ${message.tool} with args: ${JSON.stringify(args)}`);
-    
-    const command = `${toolPath} ${args.map(arg => `'${arg.replace(/'/g, "'\\''")}'`).join(' ')}`;
-    this.logger.log(`[Host Bridge Daemon] Executing command: ${command}`);
+    this.logger.log(`[Host Bridge Daemon] Running ${message.tool} with command: ${command}`);
     
     const options = {
       cwd: message.workingDirectory || process.cwd(),

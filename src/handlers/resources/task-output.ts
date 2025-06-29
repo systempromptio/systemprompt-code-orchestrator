@@ -46,7 +46,7 @@ export async function getTaskOutputResource(uri: URL): Promise<Resource> {
         title: task.title,
         status: task.status,
         branch: task.branch,
-        elapsed_seconds: task.elapsed_seconds || 0,
+        elapsed_seconds: 0, // Calculate from timestamps if needed
         created_at: task.created_at,
         updated_at: task.updated_at
       },

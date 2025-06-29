@@ -22,8 +22,10 @@ const projectRoot = path.resolve(__dirname, '..', '..');
 // Types
 interface ValidatedEnvironment {
   CLAUDE_PATH: string;
+  GEMINI_PATH: string;
   SHELL_PATH: string;
   CLAUDE_AVAILABLE: string;
+  GEMINI_AVAILABLE: string;
   CLAUDE_PROXY_HOST: string;
   CLAUDE_PROXY_PORT: string;
   MCP_PORT: string;
@@ -228,18 +230,24 @@ class StartupManager {
       CLAUDE_PATH: env.CLAUDE_PATH,
       SHELL_PATH: env.SHELL_PATH,
       CLAUDE_AVAILABLE: env.CLAUDE_AVAILABLE,
+      GEMINI_AVAILABLE: env.GEMINI_AVAILABLE || 'false',
       CLAUDE_PROXY_PORT: env.CLAUDE_PROXY_PORT
     };
     
-    const logFile = path.join(this.logDir, 'host-bridge.log');
-    const out = fs.openSync(logFile, 'a');
-    const err = fs.openSync(logFile, 'a');
+    // Daemon manages its own logs in daemon/logs/
+    const daemonDir = path.join(projectRoot, 'daemon');
+    const daemonLogsDir = path.join(daemonDir, 'logs');
+    
+    // Ensure daemon logs directory exists
+    if (!fs.existsSync(daemonLogsDir)) {
+      fs.mkdirSync(daemonLogsDir, { recursive: true });
+    }
     
     this.proxyProcess = spawn('node', ['dist/host-bridge-daemon.js'], {
-      cwd: path.join(projectRoot, 'daemon'),
+      cwd: daemonDir,
       env: proxyEnv,
       detached: true,
-      stdio: ['ignore', out, err]
+      stdio: 'ignore'
     });
     
     if (!this.proxyProcess) {
@@ -247,41 +255,59 @@ class StartupManager {
       return false;
     }
     
-    // Save PID
-    const pidFile = path.join(this.logDir, 'proxy.pid');
-    if (this.proxyProcess.pid) {
-      fs.writeFileSync(pidFile, this.proxyProcess.pid.toString());
-      this.info(`Proxy started with PID: ${this.proxyProcess.pid}`);
+    // Daemon will write its own PID to daemon/logs/daemon.pid
+    this.info(`Daemon process spawned with PID: ${this.proxyProcess.pid}`);
+    this.info(`Log file: ${path.join(daemonLogsDir, 'host-bridge.log')}`);
+    
+    // Detach the process so it runs independently
+    this.proxyProcess.unref();
+    
+    // Wait for daemon to be ready
+    const portReady = await this.waitForPort(parseInt(env.CLAUDE_PROXY_PORT), 10);
+    
+    if (!portReady) {
+      // Check if the process is still running
+      try {
+        process.kill(this.proxyProcess.pid as number, 0);
+        this.error('Daemon process is running but not listening on the expected port');
+        this.error(`Check the log file: ${path.join(daemonLogsDir, 'host-bridge.log')}`);
+      } catch (e) {
+        this.error('Daemon process died during startup');
+      }
+      return false;
     }
-    this.info(`Log file: ${logFile}`);
     
-    // Wait for proxy to be ready
-    await this.waitForPort(parseInt(env.CLAUDE_PROXY_PORT), 10);
-    
+    this.success(`Proxy is running on port ${env.CLAUDE_PROXY_PORT}`);
     return true;
   }
   
   private async killExistingProxy(): Promise<void> {
-    const pidFile = path.join(this.logDir, 'proxy.pid');
+    // Only check in the daemon logs directory
+    const pidFile = path.join(projectRoot, 'daemon', 'logs', 'daemon.pid');
+    
     if (fs.existsSync(pidFile)) {
       const pid = parseInt(fs.readFileSync(pidFile, 'utf-8'));
       try {
         process.kill(pid, 'SIGTERM');
-        this.info(`Killed existing proxy (PID: ${pid})`);
+        this.info(`Killed existing daemon (PID: ${pid})`);
         await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (e) {
-        // Process doesn't exist
+        // Process doesn't exist, remove stale PID file
       }
       fs.unlinkSync(pidFile);
     }
   }
   
   private async waitForPort(port: number, maxAttempts: number): Promise<boolean> {
+    // Give the daemon a moment to start up before checking
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
     for (let i = 0; i < maxAttempts; i++) {
       if (await this.isPortOpen(port)) {
-        this.success(`Proxy is listening on port ${port}`);
+        this.success(`Daemon is listening on port ${port}`);
         return true;
       }
+      this.info(`Waiting for daemon to start... (${i + 1}/${maxAttempts})`);
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     this.error(`Daemon failed to start on port ${port}`);
@@ -293,21 +319,23 @@ class StartupManager {
       const client = new net.Socket();
       
       client.setTimeout(1000);
-      client.on('connect', () => {
+      client.once('connect', () => {
         client.destroy();
         resolve(true);
       });
       
-      client.on('error', () => {
-        resolve(false);
-      });
-      
-      client.on('timeout', () => {
+      client.once('error', () => {
         client.destroy();
         resolve(false);
       });
       
-      client.connect(port, 'localhost');
+      client.once('timeout', () => {
+        client.destroy();
+        resolve(false);
+      });
+      
+      // Connect to localhost (127.0.0.1)
+      client.connect(port, '127.0.0.1');
     });
   }
   
@@ -327,7 +355,7 @@ class StartupManager {
     // Check if ports are available
     if (await this.isPortOpen(parseInt(env.CLAUDE_PROXY_PORT))) {
       this.error(`Port ${env.CLAUDE_PROXY_PORT} is already in use`);
-      const pidFile = path.join(this.logDir, 'daemon.pid');
+      const pidFile = path.join(projectRoot, 'daemon', 'logs', 'daemon.pid');
       if (fs.existsSync(pidFile)) {
         const pid = fs.readFileSync(pidFile, 'utf-8').trim();
         this.info(`  Found daemon PID file with PID: ${pid}`);
@@ -394,6 +422,25 @@ class StartupManager {
     fs.writeFileSync(path.join(projectRoot, '.env'), envContent);
     
     try {
+      // Check if we should skip the build (for development)
+      const skipBuild = process.env.SKIP_DOCKER_BUILD === 'true';
+      
+      if (!skipBuild) {
+        // Rebuild the Docker image to ensure latest code
+        this.info('Building Docker image with latest code...');
+        this.info('(Set SKIP_DOCKER_BUILD=true to skip this step)');
+        await execAsync('docker-compose build mcp-server', {
+          cwd: projectRoot,
+          env: dockerEnv,
+          shell: '/bin/bash'
+        });
+        this.success('Docker image built with latest code');
+      } else {
+        this.warning('Skipping Docker build (SKIP_DOCKER_BUILD=true)');
+      }
+      
+      // Now start the services
+      this.info('Starting Docker services...');
       await execAsync('docker-compose up -d', {
         cwd: projectRoot,
         env: dockerEnv,
@@ -426,6 +473,20 @@ class StartupManager {
         process.exit(1);
       }
       
+      // Build main application first
+      this.log('\n==== Building Application ====\n', colors.blue);
+      try {
+        await execAsync('npm run build:main', {
+          cwd: projectRoot,
+          shell: '/bin/bash'
+        });
+        this.success('Application built successfully');
+      } catch (error) {
+        this.error('Failed to build application');
+        this.error(`Build error: ${error}`);
+        process.exit(1);
+      }
+      
       // Build daemon
       const daemonBuilt = await this.buildDaemon();
       if (!daemonBuilt) {
@@ -453,15 +514,10 @@ class StartupManager {
       
       this.log('\n==== All Services Started Successfully! ====\n', colors.green);
       this.info('Quick commands:');
-      this.info('  View proxy logs: npm run proxy:logs');
+      this.info('  View daemon logs: tail -f daemon/logs/host-bridge.log');
       this.info('  View Docker logs: npm run docker:logs');
       this.info('  Run tests: npm test');
-      this.info('  Stop all: npm run stop:all');
-      
-      // Detach from child processes
-      if (this.proxyProcess) {
-        this.proxyProcess.unref();
-      }
+      this.info('  Stop all: npm run stop')
       
     } catch (error) {
       this.error(`Startup failed: ${error}`);

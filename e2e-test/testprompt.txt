@@ -1,3 +1,3 @@
 '/var/www/html/systemprompt-coding-agent/e2e-test/typescript/test-e2e.ts' we are going to work on this test, run it, does it work? Basically we need to 1/ load the mcp server, 2/ list the tools 3/ create a task with instructions create hello  │
 │   world html file in new branch 'test' 4/ update the task, THEN change file name to hello world two 5/ re should be albe to check the status and see detailed, informative logs of every stage of the execution, 6/ we then run end-task to show     │
-│   the task has been sucecsfully complete, the result should be that we have a new git branch with the code, detailed logs, and accureate status tracking         
+│   the task has been sucecsfully complete, the result should be that we have a new git branch with the code, detailed logs, and accureate status tracking. 

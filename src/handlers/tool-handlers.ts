@@ -19,7 +19,6 @@ import { handleCreateTask } from './tools/orchestrator/create-task.js';
 import { handleUpdateTask } from './tools/orchestrator/update-task.js';
 import { handleEndTask } from './tools/orchestrator/end-task.js';
 import { handleReportTask } from './tools/orchestrator/report-task.js';
-import { handleUpdateStats } from './tools/orchestrator/update-stats.js';
 import { handleCheckStatus } from './tools/orchestrator/check-status.js';
 import { handleCleanState } from './tools/orchestrator/clean-state.js';
 
@@ -66,15 +65,8 @@ const ToolSchemas = {
     }).optional()
   }),
   
-  report_task: z.object({
-    task_ids: z.array(z.string()).optional(),
-    report_type: z.enum(["summary", "detailed", "progress"]).default("summary"),
-    format: z.enum(["json", "markdown"]).default("json")
-  }),
-  
-  update_stats: z.object({
-    include_tasks: z.boolean().default(true),
-    include_sessions: z.boolean().default(true)
+  report: z.object({
+    id: z.string().optional()
   }),
   
   check_status: z.object({
@@ -174,11 +166,8 @@ export async function handleToolCall(
       case "end_task":
         result = await handleEndTask(args, context);
         break;
-      case "report_task":
+      case "report":
         result = await handleReportTask(args, context);
-        break;
-      case "update_stats":
-        result = await handleUpdateStats(args, context);
         break;
       case "check_status":
         result = await handleCheckStatus(args, context);

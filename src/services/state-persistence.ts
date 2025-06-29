@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { EventEmitter } from 'events';
-import { Task } from './task-store.js';
+import type { Task } from '../types/task.js';
 
 export interface PersistenceConfig {
   type: 'filesystem' | 'redis' | 'postgres';

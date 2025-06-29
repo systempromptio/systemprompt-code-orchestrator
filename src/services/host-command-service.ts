@@ -120,11 +120,7 @@ export class HostCommandService {
         }
       });
       
-      // Timeout after 30 seconds
-      setTimeout(() => {
-        client.destroy();
-        reject(new Error('Host command timeout (30 seconds)'));
-      }, 30000);
+      // No timeout - let the command run until completion
     });
   }
   

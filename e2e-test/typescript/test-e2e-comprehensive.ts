@@ -383,7 +383,7 @@ async function testCreateTaskFlow() {
   if (taskProgress.length > 0) {
     const startTs = new Date(taskProgress[0].timestamp).getTime();
     
-    taskProgress.forEach((update, idx) => {
+    taskProgress.forEach((update) => {
       const elapsed = new Date(update.timestamp).getTime() - startTs;
       const elapsedSec = (elapsed / 1000).toFixed(1);
       

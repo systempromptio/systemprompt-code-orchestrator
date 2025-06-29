@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { AgentProvider } from '../core/agent';
-import { TaskPriority, TaskType } from '../core/task';
+import { TaskType } from '../task';
 
 export interface ApiRequest<T = unknown> {
   readonly headers: RequestHeaders;
@@ -57,7 +57,6 @@ export interface CreateSessionRequest {
 export interface CreateTaskRequest {
   readonly sessionId: string;
   readonly type: TaskType;
-  readonly priority: TaskPriority;
   readonly title: string;
   readonly description: string;
   readonly assignedTo?: AgentProvider;
@@ -67,7 +66,6 @@ export interface CreateTaskRequest {
 
 export interface UpdateTaskRequest {
   readonly status?: string;
-  readonly priority?: TaskPriority;
   readonly title?: string;
   readonly description?: string;
   readonly assignedTo?: AgentProvider;
@@ -112,7 +110,6 @@ export const CreateSessionRequestSchema = z.object({
 export const CreateTaskRequestSchema = z.object({
   sessionId: z.string(),
   type: z.enum(['query', 'code_generation', 'code_review', 'refactoring', 'testing', 'documentation', 'custom']),
-  priority: z.enum(['low', 'medium', 'high', 'critical']),
   title: z.string().min(1).max(255),
   description: z.string(),
   assignedTo: z.enum(['claude', 'gemini', 'custom']).optional(),
@@ -122,7 +119,6 @@ export const CreateTaskRequestSchema = z.object({
 
 export const UpdateTaskRequestSchema = z.object({
   status: z.string().optional(),
-  priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
   title: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
   assignedTo: z.enum(['claude', 'gemini', 'custom']).optional(),

@@ -3,36 +3,38 @@ import type {
   ReadResourceRequest,
   ReadResourceResult,
   Resource,
-} from '@modelcontextprotocol/sdk/types.js';
-import { RESOURCES } from '../constants/resources.js';
-import { TaskStore } from '../services/task-store.js';
-import { logger } from '../utils/logger.js';
-import { matchResourceTemplate } from './resource-templates-handler.js';
-import { getTaskOutputResource, listTaskOutputResources } from './resources/task-output.js';
+} from "@modelcontextprotocol/sdk/types.js";
+import { RESOURCES } from "../constants/resources.js";
+import { TaskStore } from "../services/task-store.js";
+import { logger } from "../utils/logger.js";
+import { matchResourceTemplate } from "./resource-templates-handler.js";
+import { getTaskOutputResource, listTaskOutputResources } from "./resources/task-output.js";
 
 export async function handleListResources(): Promise<ListResourcesResult> {
   try {
     // Start with static resources
     const resources: Resource[] = [...RESOURCES];
-    
+
     // Add dynamic task resources
     const taskStore = TaskStore.getInstance();
     const tasks = await taskStore.getTasks();
-    tasks.forEach(task => {
+    tasks.forEach((task) => {
       resources.push({
         uri: `task://${task.id}`,
         name: `Task: ${task.title}`,
         mimeType: "application/json",
-        description: `${task.description} (Status: ${task.status})`
+        description: `${task.description} (Status: ${task.status})`,
       });
     });
-    
+
     // Add task output resources
     const taskOutputResources = await listTaskOutputResources();
     resources.push(...taskOutputResources);
-    
-    logger.debug(`📚 Listing ${resources.length} resources (${RESOURCES.length} static, ${tasks.length} tasks, ${taskOutputResources.length} outputs)`);
-    
+
+    logger.debug(
+      `📚 Listing ${resources.length} resources (${RESOURCES.length} static, ${tasks.length} tasks, ${taskOutputResources.length} outputs)`,
+    );
+
     return { resources };
   } catch (error) {
     throw new Error(`Failed to list resources: ${error}`);
@@ -50,20 +52,24 @@ export async function handleResourceCall(
     // Handle agent status
     if (uri === "agent://status") {
       const tasks = await taskStore.getTasks();
-      const activeTasks = tasks.filter(t => t.status === 'in_progress');
-      
+      const activeTasks = tasks.filter((t) => t.status === "in_progress");
+
       return {
         contents: [
           {
             uri: request.params.uri,
             mimeType: "application/json",
-            text: JSON.stringify({
-              status: "ready",
-              version: "1.0.0",
-              capabilities: ["claude", "gemini", "task-management"],
-              activeTaskCount: activeTasks.length,
-              totalTaskCount: tasks.length
-            }, null, 2),
+            text: JSON.stringify(
+              {
+                status: "ready",
+                version: "1.0.0",
+                capabilities: ["claude", "gemini", "task-management"],
+                activeTaskCount: activeTasks.length,
+                totalTaskCount: tasks.length,
+              },
+              null,
+              2,
+            ),
           },
         ],
       };
@@ -77,17 +83,21 @@ export async function handleResourceCall(
           {
             uri: request.params.uri,
             mimeType: "application/json",
-            text: JSON.stringify({
-              count: tasks.length,
-              tasks: tasks.map(task => ({
-                id: task.id,
-                title: task.title,
-                status: task.status,
-                branch: task.branch,
-                created_at: task.created_at,
-                updated_at: task.updated_at
-              }))
-            }, null, 2),
+            text: JSON.stringify(
+              {
+                count: tasks.length,
+                tasks: tasks.map((task) => ({
+                  id: task.id,
+                  title: task.title,
+                  status: task.status,
+                  branch: task.branch,
+                  created_at: task.created_at,
+                  updated_at: task.updated_at,
+                })),
+              },
+              null,
+              2,
+            ),
           },
         ],
       };
@@ -98,19 +108,21 @@ export async function handleResourceCall(
       const url = new URL(uri);
       const resource = await getTaskOutputResource(url);
       return {
-        contents: [{
-          uri: resource.uri,
-          mimeType: resource.mimeType || "application/json",
-          text: String(resource.text || "{}")
-        }]
+        contents: [
+          {
+            uri: resource.uri,
+            mimeType: resource.mimeType || "application/json",
+            text: String(resource.text || "{}"),
+          },
+        ],
       };
     }
-    
+
     // Handle individual task resources
     if (uri.startsWith("task://")) {
       const taskId = uri.replace("task://", "");
       const task = await taskStore.getTask(taskId);
-      
+
       if (!task) {
         throw new Error(`Task not found: ${taskId}`);
       }
@@ -120,22 +132,24 @@ export async function handleResourceCall(
           {
             uri: request.params.uri,
             mimeType: "application/json",
-            text: JSON.stringify({
-              id: task.id,
-              title: task.title,
-              description: task.description,
-              status: task.status,
-              branch: task.branch,
-              priority: task.priority,
-              elapsed_seconds: task.elapsed_seconds,
-              started_at: task.started_at,
-              completed_at: task.completed_at,
-              assigned_to: task.assigned_to,
-              created_at: task.created_at,
-              updated_at: task.updated_at,
-              logs: task.logs,
-              result: task.result
-            }, null, 2),
+            text: JSON.stringify(
+              {
+                id: task.id,
+                title: task.title,
+                description: task.description,
+                status: task.status,
+                branch: task.branch,
+                started_at: task.started_at,
+                completed_at: task.completed_at,
+                assigned_to: task.assigned_to,
+                created_at: task.created_at,
+                updated_at: task.updated_at,
+                logs: task.logs,
+                result: task.result,
+              },
+              null,
+              2,
+            ),
           },
         ],
       };
@@ -148,10 +162,14 @@ export async function handleResourceCall(
           {
             uri: request.params.uri,
             mimeType: "application/json",
-            text: JSON.stringify({
-              sessions: [],
-              count: 0
-            }, null, 2),
+            text: JSON.stringify(
+              {
+                sessions: [],
+                count: 0,
+              },
+              null,
+              2,
+            ),
           },
         ],
       };
@@ -171,11 +189,13 @@ export async function handleResourceCall(
           throw new Error(`Task not found: ${taskId}`);
         }
         return {
-          contents: [{
-            uri: request.params.uri,
-            mimeType: "text/plain",
-            text: task.logs.join('\n') || 'No logs available'
-          }]
+          contents: [
+            {
+              uri: request.params.uri,
+              mimeType: "text/plain",
+              text: task.logs.join("\n") || "No logs available",
+            },
+          ],
         };
       }
 
@@ -187,11 +207,13 @@ export async function handleResourceCall(
           throw new Error(`Task not found: ${taskId}`);
         }
         return {
-          contents: [{
-            uri: request.params.uri,
-            mimeType: "application/json",
-            text: JSON.stringify(task.result || { message: 'No result available' }, null, 2)
-          }]
+          contents: [
+            {
+              uri: request.params.uri,
+              mimeType: "application/json",
+              text: JSON.stringify(task.result || { message: "No result available" }, null, 2),
+            },
+          ],
         };
       }
 
@@ -199,16 +221,22 @@ export async function handleResourceCall(
       if (uri.match(/^session:\/\/[^\/]+\/[^\/]+$/)) {
         const { sessionType, sessionId } = params;
         return {
-          contents: [{
-            uri: request.params.uri,
-            mimeType: "application/json",
-            text: JSON.stringify({
-              type: sessionType,
-              id: sessionId,
-              status: 'placeholder',
-              message: 'Session details not yet implemented'
-            }, null, 2)
-          }]
+          contents: [
+            {
+              uri: request.params.uri,
+              mimeType: "application/json",
+              text: JSON.stringify(
+                {
+                  type: sessionType,
+                  id: sessionId,
+                  status: "placeholder",
+                  message: "Session details not yet implemented",
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       }
 
@@ -216,22 +244,27 @@ export async function handleResourceCall(
       if (uri.match(/^branch:\/\/[^\/]+\/tasks$/)) {
         const { branchName } = params;
         const tasks = await taskStore.getTasks();
-        const branchTasks = tasks.filter(t => t.branch === branchName);
+        const branchTasks = tasks.filter((t) => t.branch === branchName);
         return {
-          contents: [{
-            uri: request.params.uri,
-            mimeType: "application/json",
-            text: JSON.stringify({
-              branch: branchName,
-              count: branchTasks.length,
-              tasks: branchTasks.map(t => ({
-                id: t.id,
-                title: t.title,
-                status: t.status,
-                priority: t.priority
-              }))
-            }, null, 2)
-          }]
+          contents: [
+            {
+              uri: request.params.uri,
+              mimeType: "application/json",
+              text: JSON.stringify(
+                {
+                  branch: branchName,
+                  count: branchTasks.length,
+                  tasks: branchTasks.map((t) => ({
+                    id: t.id,
+                    title: t.title,
+                    status: t.status,
+                  })),
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       }
 
@@ -239,22 +272,27 @@ export async function handleResourceCall(
       if (uri.match(/^project:\/\/[^\/]+\/status$/)) {
         const { projectPath } = params;
         const tasks = await taskStore.getTasks();
-        const projectTasks = tasks.filter(t => 
-          t.project_path === projectPath || 
-          t.project_path === decodeURIComponent(projectPath)
+        const projectTasks = tasks.filter(
+          (t) => t.branch === projectPath || t.branch === decodeURIComponent(projectPath),
         );
         return {
-          contents: [{
-            uri: request.params.uri,
-            mimeType: "application/json",
-            text: JSON.stringify({
-              project: projectPath,
-              taskCount: projectTasks.length,
-              activeTasks: projectTasks.filter(t => t.status === 'in_progress').length,
-              completedTasks: projectTasks.filter(t => t.status === 'completed').length,
-              status: 'active'
-            }, null, 2)
-          }]
+          contents: [
+            {
+              uri: request.params.uri,
+              mimeType: "application/json",
+              text: JSON.stringify(
+                {
+                  project: projectPath,
+                  taskCount: projectTasks.length,
+                  activeTasks: projectTasks.filter((t) => t.status === "in_progress").length,
+                  completedTasks: projectTasks.filter((t) => t.status === "completed").length,
+                  status: "active",
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       }
 
@@ -262,11 +300,13 @@ export async function handleResourceCall(
       if (uri.match(/^log:\/\/[^\/]+\/[^\/]+$/)) {
         const { logType, date } = params;
         return {
-          contents: [{
-            uri: request.params.uri,
-            mimeType: "text/plain",
-            text: `Logs for ${logType} on ${date}\n\nLog retrieval not yet implemented.`
-          }]
+          contents: [
+            {
+              uri: request.params.uri,
+              mimeType: "text/plain",
+              text: `Logs for ${logType} on ${date}\n\nLog retrieval not yet implemented.`,
+            },
+          ],
         };
       }
     }
