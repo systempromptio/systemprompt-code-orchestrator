@@ -11,11 +11,9 @@ export { Task, TaskStatus, AITool, createTaskId } from '../../../../types/task.j
 export * from './validation.js';
 
 // Export service utilities
-export { gitOperations } from './git.js';
 export { agentOperations } from './agent.js';
 export { taskOperations } from './task.js';
 
 // Export specific types that are commonly used
-export type { GitStatus, BranchSetupResult } from './git.js';
 export type { AgentStartResult, AgentExecuteResult } from './agent.js';
 export type { TaskCreationParams, TaskReport } from './task.js';

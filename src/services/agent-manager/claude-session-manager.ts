@@ -35,12 +35,18 @@ export class ClaudeSessionManager {
       this.claudeService.setTaskId(serviceSessionId, config.task_id);
     }
 
+    // Link with MCP session if provided
+    if (config.mcp_session_id) {
+      this.claudeService.setMcpSessionId(serviceSessionId, config.mcp_session_id);
+    }
+
     // Create agent session
     const session = this.sessionStore.createSession(
       'claude',
       serviceSessionId,
       config.project_path,
-      config.task_id
+      config.task_id,
+      config.mcp_session_id
     );
 
     // Log session creation
@@ -50,7 +56,8 @@ export class ClaudeSessionManager {
         session.id,
         'Claude Code',
         config.project_path,
-        config.initial_context
+        config.initial_context,
+        config.mcp_session_id
       );
     }
 
@@ -77,7 +84,7 @@ export class ClaudeSessionManager {
     try {
       // Log command
       if (session.taskId) {
-        await this.taskLogger.logCommandSent(session.taskId, command);
+        await this.taskLogger.logCommandSent(session.taskId, command, session.mcpSessionId);
       }
 
       // Execute command
@@ -96,7 +103,8 @@ export class ClaudeSessionManager {
           session.taskId,
           duration,
           output.length,
-          output
+          output,
+          session.mcpSessionId
         );
       }
 
@@ -116,7 +124,8 @@ export class ClaudeSessionManager {
         await this.taskLogger.logError(
           session.taskId,
           '[COMMAND_ERROR]',
-          error
+          error,
+          session.mcpSessionId
         );
       }
 
@@ -140,7 +149,8 @@ export class ClaudeSessionManager {
           session.taskId,
           session.id,
           'Claude',
-          true
+          true,
+          session.mcpSessionId
         );
       }
     } catch (error) {

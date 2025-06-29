@@ -112,16 +112,11 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
   log.debug(`Tool: ${taskData.result.tool}`);
   log.debug(`Status: ${taskData.result.status}`);
   
-  // Step 2: Subscribe to task resource
+  // Step 2: Task resource URI for monitoring
   const taskUri = `task://${taskId}`;
-  log.info(`🔔 Subscribing to task resource: ${taskUri}`);
-  
-  try {
-    await client.subscribeResource({ uri: taskUri });
-    log.success(`Subscribed to ${taskUri}`);
-  } catch (error) {
-    log.warning(`Could not subscribe to task resource: ${error}`);
-  }
+  log.info(`📍 Task resource URI: ${taskUri}`);
+  // Note: MCP server doesn't implement subscribe/unsubscribe methods
+  // Notifications are automatically sent to all connected clients
   
   // Step 3: Read initial task state
   await sleep(1000); // Give it a moment to initialize
@@ -180,13 +175,7 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
     }
   }
   
-  // Step 6: Unsubscribe from resource
-  try {
-    await client.unsubscribeResource({ uri: taskUri });
-    log.info(`🔕 Unsubscribed from ${taskUri}`);
-  } catch (error) {
-    log.debug(`Could not unsubscribe: ${error}`);
-  }
+  // Step 6: No unsubscribe needed (not implemented by MCP server)
   
   // Step 7: Get final task state and output
   log.section('📄 Final Task State');

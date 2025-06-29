@@ -15,8 +15,7 @@ async function main() {
       arguments: {
         title: 'Simple Test',
         tool: 'CLAUDECODE',
-        instructions: 'Say hello',
-        branch: 'test-' + Date.now()
+        instructions: 'Say hello'
       }
     });
     

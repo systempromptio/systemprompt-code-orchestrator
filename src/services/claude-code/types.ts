@@ -18,6 +18,7 @@ export interface ClaudeCodeSession {
   readonly createdAt: Date;
   lastActivity: Date;
   taskId?: string;
+  mcpSessionId?: string;
   readonly streamBuffer: string[];
 }
 

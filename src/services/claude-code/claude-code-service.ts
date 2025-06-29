@@ -86,6 +86,20 @@ export class ClaudeCodeService extends EventEmitter {
   }
 
   /**
+   * Sets MCP session ID for a session
+   */
+  setMcpSessionId(sessionId: string, mcpSessionId: string): void {
+    this.sessionManager.setMcpSessionId(sessionId, mcpSessionId);
+  }
+
+  /**
+   * Finds a session by ID
+   */
+  findSession(sessionId: string): ClaudeCodeSession | undefined {
+    return this.sessionManager.findSession(sessionId);
+  }
+
+  /**
    * Executes a query synchronously
    */
   async querySync(
@@ -123,7 +137,7 @@ export class ClaudeCodeService extends EventEmitter {
           const tracker = await this.getProgressTracker();
           for (const message of queryResult.messages) {
             if (message.type === 'assistant' && message.message?.content) {
-              await tracker.logAssistantMessage(session.taskId, message.message.content);
+              await tracker.logAssistantMessage(session.taskId, message.message.content, session.mcpSessionId);
             }
           }
         }

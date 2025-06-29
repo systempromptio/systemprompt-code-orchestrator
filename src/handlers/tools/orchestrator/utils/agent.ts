@@ -66,6 +66,7 @@ export class AgentOperations {
         const sessionId = await this.agentManager.startClaudeSession({
           project_path: workingDirectory,
           task_id: task.id,
+          mcp_session_id: options.sessionId,
           options: claudeOptions
         });
         
@@ -74,10 +75,13 @@ export class AgentOperations {
         if (agentSession?.serviceSessionId) {
           this.claudeService.setTaskId(agentSession.serviceSessionId, task.id);
           
+          // Also set the MCP sessionId to ensure notifications go to the right session
           if (options.sessionId) {
+            this.claudeService.setMcpSessionId(agentSession.serviceSessionId, options.sessionId);
+            
             await this.taskStore.addLog(
               task.id,
-              `[SESSION_LINKED] Claude session ${agentSession.serviceSessionId} linked to task`,
+              `[SESSION_LINKED] Claude session ${agentSession.serviceSessionId} linked to task and MCP session`,
               options.sessionId
             );
           }
@@ -92,6 +96,7 @@ export class AgentOperations {
         const sessionId = await this.agentManager.startGeminiSession({
           project_path: workingDirectory,
           task_id: task.id,
+          mcp_session_id: options.sessionId,
           options: {}
         });
         

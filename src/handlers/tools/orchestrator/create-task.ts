@@ -14,7 +14,6 @@ import {
 import {
   validateInput,
   isToolAvailable,
-  gitOperations,
   agentOperations,
   taskOperations,
 } from "./utils/index.js";
@@ -31,8 +30,7 @@ import {
  * await handleCreateTask({
  *   title: "Implement user authentication",
  *   tool: "CLAUDECODE",
- *   instructions: "Add JWT-based authentication to the API",
- *   branch: "feature/auth"
+ *   instructions: "Add JWT-based authentication to the API"
  * }, { sessionId: "session_123" });
  * ```
  */
@@ -55,7 +53,7 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (
         title: validated.title,
         description: validated.instructions,
         tool: validated.tool,
-        branch: validated.branch,
+        branch: "", // No longer using branches
         projectPath,
       },
       context?.sessionId,
@@ -63,7 +61,6 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (
 
     // Initialize result
     let agentSessionId: string | null = null;
-    let branchCreated = false;
 
     try {
       // Update task status to in_progress
@@ -71,19 +68,10 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (
         completedAt: undefined,
       });
 
-      // Set up git branch
-      const branchResult = await setupGitBranch(
-        projectPath,
-        validated.branch,
-        task.id,
-        context?.sessionId,
-      );
-      branchCreated = branchResult.wasCreated;
-
-      // Start agent session
+      // Start agent session without git branch setup
       const agentResult = await agentOperations.startAgentForTask(validated.tool, task, {
         workingDirectory: projectPath,
-        branch: validated.branch,
+        branch: "", // No branch needed
         sessionId: context?.sessionId,
       });
 
@@ -125,7 +113,6 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (
       logger.info("Task created successfully", {
         taskId: task.id,
         agentSessionId,
-        branchCreated,
       });
     } catch (error) {
       // Update task status to failed
@@ -150,8 +137,6 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (
         status: "in_progress",
         tool: validated.tool,
         session_id: agentSessionId,
-        branch: validated.branch,
-        branch_created: branchCreated,
         instructions_started: !!validated.instructions,
         created_at: task.created_at,
       },
@@ -168,43 +153,6 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (
     });
   }
 };
-
-/**
- * Sets up git branch for the task
- */
-async function setupGitBranch(
-  projectPath: string,
-  branchName: string,
-  taskId: string,
-  sessionId?: string,
-): Promise<{ wasCreated: boolean }> {
-  try {
-    const result = await gitOperations.setupBranch(projectPath, branchName, {
-      createIfNotExists: true,
-      stashChanges: true,
-    });
-
-    await taskOperations.addTaskLog(taskId, `[GIT_SETUP] ${result.message}`, sessionId);
-
-    if (result.stashCreated) {
-      await taskOperations.addTaskLog(
-        taskId,
-        "[GIT_STASH] Created stash for uncommitted changes",
-        sessionId,
-      );
-    }
-
-    return { wasCreated: result.wasCreated };
-  } catch (error) {
-    logger.error("Git branch setup failed", { error, branchName });
-    await taskOperations.addTaskLog(
-      taskId,
-      `[GIT_ERROR] Failed to set up branch: ${error}`,
-      sessionId,
-    );
-    throw error;
-  }
-}
 
 /**
  * Executes initial instructions with the agent

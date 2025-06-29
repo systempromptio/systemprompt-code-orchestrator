@@ -23,7 +23,8 @@ export class SessionStore {
     type: AgentType,
     serviceSessionId: string,
     projectPath: string,
-    taskId?: string
+    taskId?: string,
+    mcpSessionId?: string
   ): AgentSession {
     const sessionId = `${SESSION_ID_PREFIXES[type.toUpperCase() as keyof typeof SESSION_ID_PREFIXES]}${uuidv4()}`;
     
@@ -34,6 +35,7 @@ export class SessionStore {
       status: 'active',
       projectPath,
       taskId,
+      mcpSessionId,
       created_at: new Date().toISOString(),
       last_activity: new Date().toISOString(),
       output_buffer: [],

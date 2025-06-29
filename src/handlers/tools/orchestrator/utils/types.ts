@@ -11,8 +11,7 @@ import { Task, AIToolSchema } from '../../../../types/task.js';
 export const CreateTaskArgsSchema = z.object({
   title: z.string().min(1).max(200),
   tool: AIToolSchema,
-  instructions: z.string().min(1).max(10000),
-  branch: z.string().min(1).max(100)
+  instructions: z.string().min(1).max(10000)
 });
 export type CreateTaskArgs = z.infer<typeof CreateTaskArgsSchema>;
 

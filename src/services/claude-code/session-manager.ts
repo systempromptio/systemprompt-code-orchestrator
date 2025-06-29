@@ -85,6 +85,15 @@ export class SessionManager {
   }
 
   /**
+   * Sets MCP session ID for a session
+   */
+  setMcpSessionId(sessionId: string, mcpSessionId: string): void {
+    const session = this.getSession(sessionId);
+    session.mcpSessionId = mcpSessionId;
+    logger.info('Linked session to MCP session', { sessionId, mcpSessionId });
+  }
+
+  /**
    * Ends a session
    */
   endSession(sessionId: string): void {

@@ -35,7 +35,8 @@ export class GeminiSessionManager {
       'gemini',
       serviceSessionId,
       config.project_path,
-      config.task_id
+      config.task_id,
+      config.mcp_session_id
     );
 
     // Set up response listener
@@ -47,7 +48,9 @@ export class GeminiSessionManager {
         config.task_id,
         session.id,
         'Gemini',
-        config.project_path
+        config.project_path,
+        undefined,
+        config.mcp_session_id
       );
     }
 
@@ -73,7 +76,7 @@ export class GeminiSessionManager {
     try {
       // Log command
       if (session.taskId) {
-        await this.taskLogger.logCommandSent(session.taskId, command);
+        await this.taskLogger.logCommandSent(session.taskId, command, session.mcpSessionId);
       }
 
       // Execute command
@@ -95,7 +98,8 @@ export class GeminiSessionManager {
             await this.taskLogger.logError(
               session.taskId,
               LOG_PREFIXES.GEMINI_ERROR,
-              response.error
+              response.error,
+              session.mcpSessionId
             );
           }
 
@@ -117,7 +121,8 @@ export class GeminiSessionManager {
         await this.taskLogger.logGeminiResponse(
           session.taskId,
           duration,
-          responses.length
+          responses.length,
+          session.mcpSessionId
         );
       }
 
@@ -137,7 +142,8 @@ export class GeminiSessionManager {
         await this.taskLogger.logError(
           session.taskId,
           LOG_PREFIXES.COMMAND_ERROR,
-          error
+          error,
+          session.mcpSessionId
         );
       }
 
@@ -161,7 +167,8 @@ export class GeminiSessionManager {
           session.taskId,
           session.id,
           'Gemini',
-          true
+          true,
+          session.mcpSessionId
         );
       }
     } catch (error) {
@@ -175,7 +182,8 @@ export class GeminiSessionManager {
           session.taskId,
           session.id,
           'Gemini',
-          false
+          false,
+          session.mcpSessionId
         );
       }
 

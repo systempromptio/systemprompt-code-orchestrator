@@ -17,8 +17,8 @@ export class ProgressTracker {
     if (!session.taskId || !data.trim()) return;
 
     try {
-      // Log the raw data to task
-      await this.taskStore.addLog(session.taskId, data.trim());
+      // Log the raw data to task with MCP sessionId to avoid broadcast
+      await this.taskStore.addLog(session.taskId, data.trim(), session.mcpSessionId);
       
       // Emit progress event
       return {
@@ -38,16 +38,17 @@ export class ProgressTracker {
   /**
    * Logs assistant message to task
    */
-  async logAssistantMessage(taskId: string, content: any[]): Promise<void> {
+  async logAssistantMessage(taskId: string, content: any[], mcpSessionId?: string): Promise<void> {
     if (!Array.isArray(content)) return;
 
     for (const item of content) {
       if (item.type === 'text' && item.text) {
-        await this.taskStore.addLog(taskId, `[ASSISTANT_MESSAGE] ${item.text}`);
+        await this.taskStore.addLog(taskId, `[ASSISTANT_MESSAGE] ${item.text}`, mcpSessionId);
       } else if (item.type === 'tool_use') {
         await this.taskStore.addLog(
           taskId, 
-          `[TOOL_USE] ${item.name || 'unknown'}: ${JSON.stringify(item.input || {})}`
+          `[TOOL_USE] ${item.name || 'unknown'}: ${JSON.stringify(item.input || {})}`,
+          mcpSessionId
         );
       }
     }

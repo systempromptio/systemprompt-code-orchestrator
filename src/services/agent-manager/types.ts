@@ -16,6 +16,7 @@ export interface AgentSession {
   status: AgentSessionStatus;
   readonly projectPath: string;
   readonly taskId?: string;
+  readonly mcpSessionId?: string;
   readonly created_at: string;
   last_activity: string;
   readonly output_buffer: string[];
@@ -43,6 +44,7 @@ export interface AgentError {
 export interface ClaudeSessionConfig {
   project_path: string;
   task_id?: string;
+  mcp_session_id?: string;
   mode?: 'interactive' | 'batch' | 'review';
   environment_variables?: Record<string, string>;
   initial_context?: string;
@@ -52,6 +54,7 @@ export interface ClaudeSessionConfig {
 export interface GeminiSessionConfig {
   project_path: string;
   task_id?: string;
+  mcp_session_id?: string;
   model?: string;
   environment_variables?: Record<string, string>;
   options?: GeminiOptions;

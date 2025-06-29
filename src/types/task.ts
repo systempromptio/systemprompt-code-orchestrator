@@ -50,7 +50,7 @@ export interface Task {
   readonly title: string;
   readonly description: string;
   readonly status: TaskStatus;
-  readonly branch: string;
+  readonly branch?: string; // Optional - git branching managed by agents
   readonly tool: AITool;
   readonly created_at: string;
   readonly updated_at: string;
@@ -69,7 +69,7 @@ export const TaskSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().min(1).max(5000),
   status: TaskStatusSchema,
-  branch: z.string(),
+  branch: z.string().optional(), // Optional - git branching managed by agents
   tool: AIToolSchema,
   created_at: z.string(),
   updated_at: z.string(),

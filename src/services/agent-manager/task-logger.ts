@@ -18,18 +18,21 @@ export class TaskLogger {
     sessionId: string,
     type: string,
     projectPath: string,
-    initialContext?: string
+    initialContext?: string,
+    mcpSessionId?: string
   ): Promise<void> {
     try {
       await this.taskStore.addLog(
         taskId,
-        `${LOG_PREFIXES.SESSION_CREATED} ${type} session created: ${sessionId}, working directory: ${projectPath}`
+        `${LOG_PREFIXES.SESSION_CREATED} ${type} session created: ${sessionId}, working directory: ${projectPath}`,
+        mcpSessionId
       );
 
       if (initialContext) {
         await this.taskStore.addLog(
           taskId,
-          `${LOG_PREFIXES.SESSION_CONTEXT} Initial context provided: ${initialContext.substring(0, 200)}...`
+          `${LOG_PREFIXES.SESSION_CONTEXT} Initial context provided: ${initialContext.substring(0, 200)}...`,
+          mcpSessionId
         );
       }
     } catch (error) {
@@ -40,9 +43,9 @@ export class TaskLogger {
   /**
    * Logs command being sent
    */
-  async logCommandSent(taskId: string, command: string): Promise<void> {
+  async logCommandSent(taskId: string, command: string, mcpSessionId?: string): Promise<void> {
     try {
-      await this.taskStore.addLog(taskId, `${LOG_PREFIXES.COMMAND_SENT} ${command}`);
+      await this.taskStore.addLog(taskId, `${LOG_PREFIXES.COMMAND_SENT} ${command}`, mcpSessionId);
     } catch (error) {
       logger.error('Failed to log command', { taskId, error });
     }
@@ -55,19 +58,22 @@ export class TaskLogger {
     taskId: string,
     duration: number,
     outputLength: number,
-    output: string
+    output: string,
+    mcpSessionId?: string
   ): Promise<void> {
     try {
       await this.taskStore.addLog(
         taskId,
-        `${LOG_PREFIXES.RESPONSE_RECEIVED} Duration: ${duration}ms, Output length: ${outputLength} chars`
+        `${LOG_PREFIXES.RESPONSE_RECEIVED} Duration: ${duration}ms, Output length: ${outputLength} chars`,
+        mcpSessionId
       );
 
       if (outputLength > 0) {
         const preview = output.substring(0, RESPONSE_PREVIEW_LENGTH);
         await this.taskStore.addLog(
           taskId,
-          `${LOG_PREFIXES.RESPONSE_PREVIEW} ${preview}${outputLength > RESPONSE_PREVIEW_LENGTH ? '...' : ''}`
+          `${LOG_PREFIXES.RESPONSE_PREVIEW} ${preview}${outputLength > RESPONSE_PREVIEW_LENGTH ? '...' : ''}`,
+          mcpSessionId
         );
       }
     } catch (error) {
@@ -81,12 +87,14 @@ export class TaskLogger {
   async logGeminiResponse(
     taskId: string,
     duration: number,
-    responseCount: number
+    responseCount: number,
+    mcpSessionId?: string
   ): Promise<void> {
     try {
       await this.taskStore.addLog(
         taskId,
-        `${LOG_PREFIXES.GEMINI_RESPONSE} Duration: ${duration}ms, Response count: ${responseCount}`
+        `${LOG_PREFIXES.GEMINI_RESPONSE} Duration: ${duration}ms, Response count: ${responseCount}`,
+        mcpSessionId
       );
     } catch (error) {
       logger.error('Failed to log Gemini response', { taskId, error });
@@ -96,10 +104,10 @@ export class TaskLogger {
   /**
    * Logs error
    */
-  async logError(taskId: string, prefix: string, error: any): Promise<void> {
+  async logError(taskId: string, prefix: string, error: any, mcpSessionId?: string): Promise<void> {
     try {
       const message = error instanceof Error ? error.message : String(error);
-      await this.taskStore.addLog(taskId, `${prefix} ${message}`);
+      await this.taskStore.addLog(taskId, `${prefix} ${message}`, mcpSessionId);
     } catch (logError) {
       logger.error('Failed to log error', { taskId, error: logError });
     }
@@ -112,18 +120,21 @@ export class TaskLogger {
     taskId: string,
     sessionId: string,
     type: string,
-    success: boolean
+    success: boolean,
+    mcpSessionId?: string
   ): Promise<void> {
     try {
       if (success) {
         await this.taskStore.addLog(
           taskId,
-          `${LOG_PREFIXES.SESSION_TERMINATED} ${type} session ended successfully: ${sessionId}`
+          `${LOG_PREFIXES.SESSION_TERMINATED} ${type} session ended successfully: ${sessionId}`,
+          mcpSessionId
         );
       } else {
         await this.taskStore.addLog(
           taskId,
-          `${LOG_PREFIXES.SESSION_ERROR} Failed to end ${type} session: ${sessionId}`
+          `${LOG_PREFIXES.SESSION_ERROR} Failed to end ${type} session: ${sessionId}`,
+          mcpSessionId
         );
       }
     } catch (error) {
