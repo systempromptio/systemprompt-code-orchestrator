@@ -126,12 +126,9 @@ export const handleCheckStatus: ToolHandler<CheckStatusArgs> = async (
   context?: ToolHandlerContext
 ): Promise<CallToolResult> => {
   try {
-    // Validate input
-    const validated = args;
+    // No validation needed - check-status accepts no arguments
     
     logger.info('Checking system status', {
-      verbose: validated.verbose,
-      includeTasks: validated.include_tasks,
       sessionId: context?.sessionId
     });
     
@@ -187,18 +184,16 @@ export const handleCheckStatus: ToolHandler<CheckStatusArgs> = async (
       checkFileRootConfiguration(status.file_root)
     ]);
     
-    // Get active tasks and sessions if requested
-    if (validated.include_tasks) {
-      const tasks = await taskOperations.taskStore.getAllTasks();
-      status.active_tasks = tasks.filter((t: any) => 
-        t.status === 'pending' || t.status === 'in_progress'
-      ).length;
-      
-      const sessions = agentOperations.agentManager.getAllSessions();
-      status.active_sessions = sessions.filter((s: any) => 
-        s.status === 'active' || s.status === 'busy'
-      ).length;
-    }
+    // Always get active tasks and sessions count
+    const tasks = await taskOperations.taskStore.getAllTasks();
+    status.active_tasks = tasks.filter((t: any) => 
+      t.status === 'pending' || t.status === 'in_progress'
+    ).length;
+    
+    const sessions = agentOperations.agentManager.getAllSessions();
+    status.active_sessions = sessions.filter((s: any) => 
+      s.status === 'active' || s.status === 'busy'
+    ).length;
     
     // Determine overall status based on tool availability only
     const claudeActive = status.claude.available;
@@ -222,8 +217,8 @@ export const handleCheckStatus: ToolHandler<CheckStatusArgs> = async (
     
     // Build response
     const response = await buildStatusResponse(status, {
-      verbose: validated.verbose || false,
-      include_tasks: validated.include_tasks || false
+      verbose: false,
+      include_tasks: false
     });
     
     return formatToolResponse({
