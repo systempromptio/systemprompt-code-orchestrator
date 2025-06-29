@@ -87,6 +87,13 @@ interface StatusCheckResult {
   file_root: FileRootStatus;
   active_tasks?: number;
   active_sessions?: number;
+  open_processes: Array<{
+    id: string;
+    type: string;
+    status: string;
+    taskId?: string;
+    created_at: string;
+  }>;
   details?: {
     claude: ServiceStatus;
     gemini: ServiceStatus;
@@ -215,11 +222,25 @@ export const handleCheckStatus: ToolHandler<CheckStatusArgs> = async (
       activeSessions: status.active_sessions
     });
     
+    // Get all open processes
+    const openProcesses = agentOperations.agentManager.getAllSessions()
+      .filter((s: any) => s.status === 'active' || s.status === 'busy')
+      .map((s: any) => ({
+        id: s.id,
+        type: s.type,
+        status: s.status,
+        taskId: s.taskId,
+        created_at: s.created_at
+      }));
+    
     // Build response
     const response = await buildStatusResponse(status, {
       verbose: false,
       include_tasks: false
     });
+    
+    // Always include open processes
+    response.open_processes = openProcesses;
     
     return formatToolResponse({
       message: response.message,
@@ -492,14 +513,16 @@ async function buildStatusResponse(
         cli_name: status.gemini.cli_name
       }
     },
-    file_root: status.file_root
+    file_root: status.file_root,
+    open_processes: [] // Will be populated later
   };
   
-  // Add task/session counts if available
-  if (options.include_tasks) {
-    response.active_tasks = status.active_tasks;
-    response.active_sessions = status.active_sessions;
-  }
+  // Always add task/session counts
+  response.active_tasks = status.active_tasks;
+  response.active_sessions = status.active_sessions;
+  
+  // Initialize open_processes array
+  response.open_processes = [];
   
   // Add verbose details if requested
   if (options.verbose) {
