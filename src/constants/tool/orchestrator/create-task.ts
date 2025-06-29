@@ -6,24 +6,16 @@ export const createTask: Tool = {
   inputSchema: {
     type: "object",
     properties: {
-      title: {
-        type: "string",
-        description: "Short, descriptive title for the task"
-      },
       tool: {
         type: "string",
         enum: ["CLAUDECODE", "GEMINICLI"],
-        description: "Which AI tool to use for this task"
+        description: "Which AI tool to use for this task. default is CLAUDECODE",
       },
       instructions: {
         type: "string",
-        description: "Detailed instructions of what needs to be done"
+        description: "Detailed instructions of what needs to be done",
       },
-      branch: {
-        type: "string",
-        description: "Git branch name to use for this task (will be created if it doesn't exist)"
-      }
     },
-    required: ["title", "tool", "instructions", "branch"]
-  }
+    required: ["instructions"],
+  },
 };

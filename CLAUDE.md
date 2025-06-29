@@ -134,3 +134,40 @@ create_task({
 ```
 
 This architecture ensures that AI agents work with real project files on the correct git branches, while maintaining the benefits of Docker containerization for the MCP server.
+
+## Internet Tunnel Setup for Docker Container
+
+The MCP server runs in a Docker container and can be exposed to the internet via Cloudflare tunnel. This allows remote access to the local Docker container through an HTTPS URL.
+
+### Key Requirements:
+1. **Docker Container**: MCP server runs on port 3000 inside Docker, mapped to host port 3000
+2. **Cloudflare Tunnel**: Creates HTTPS tunnel pointing to `http://localhost:3000` (the Docker container)
+3. **Test Connection**: E2E tests must connect to the Docker container via the HTTPS tunnel URL
+
+### Usage:
+```bash
+# Terminal 1: Start server with tunnel
+npm run tunnel
+
+# Terminal 2: Run tests against tunnel URL
+npm run test:tunnel
+```
+
+### How It Works:
+1. `npm run tunnel` starts cloudflared pointing to localhost:3000 (Docker container)
+2. Tunnel URL is saved to `.tunnel-url` file
+3. Docker container receives TUNNEL_URL environment variable
+4. Tests automatically detect and use the HTTPS tunnel URL
+5. All requests go: Internet → Cloudflare → Tunnel → Docker Container
+
+### Environment Variables:
+- `TUNNEL_URL`: The HTTPS URL of the Cloudflare tunnel
+- `TUNNEL_ENABLED`: Set to "true" when tunnel is active
+- `PUBLIC_URL`: Alias for TUNNEL_URL
+- `MCP_BASE_URL`: Override for test connections
+
+### Test URL Detection Priority:
+1. `MCP_BASE_URL` environment variable (if set)
+2. `.tunnel-url` file (created by tunnel script)
+3. `TUNNEL_URL` environment variable
+4. Falls back to `http://127.0.0.1:3000` if no tunnel

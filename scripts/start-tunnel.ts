@@ -62,7 +62,7 @@ class TunnelStarter {
   
   async startTunnel(): Promise<string> {
     return new Promise((resolve, reject) => {
-      const port = process.env.MCP_PORT || '3010';
+      const port = process.env.PORT || '3000';
       
       this.info(`Starting Cloudflare tunnel on port ${port}...`);
       
@@ -167,7 +167,7 @@ class TunnelStarter {
     this.info('Starting all services with tunnel enabled...');
     
     // Run the start-all script directly
-    const startAllPath = path.join(projectRoot, 'build', 'scripts', 'start-all.js');
+    const startAllPath = path.join(projectRoot, 'scripts', 'start-all.js');
     
     // Use spawn to run start-all with tunnel environment
     const startProcess = spawn('node', [startAllPath], {

@@ -199,9 +199,7 @@ export class TaskManager extends TypedEventEmitterImpl<TaskEventMap> {
         tasks = tasks.filter(t => t.assigned_to === filter.assignedTo);
       }
       
-      if (filter.branch) {
-        tasks = tasks.filter(t => t.branch === filter.branch);
-      }
+      // Branch filtering removed - not part of TaskFilter
       
       if (filter.createdAfter) {
         tasks = tasks.filter(t => t.created_at >= filter.createdAfter!);
@@ -214,7 +212,6 @@ export class TaskManager extends TypedEventEmitterImpl<TaskEventMap> {
       if (filter.search) {
         const search = filter.search.toLowerCase();
         tasks = tasks.filter(t => 
-          t.title.toLowerCase().includes(search) ||
           t.description.toLowerCase().includes(search)
         );
       }

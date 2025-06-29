@@ -1,56 +1,41 @@
 # Scripts Directory
 
-This directory contains TypeScript utility scripts for managing the systemprompt-coding-agent project.
+This directory contains essential TypeScript scripts for managing the Systemprompt Coding Agent MCP Server.
 
-## Scripts
+## Core Scripts
 
-### start-all.ts
-- **Purpose**: Unified startup script that validates environment, builds the proxy, and starts all services
-- **Usage**: `npm start` (from root directory)
-- **Features**:
-  - Validates environment variables
-  - Detects Claude CLI and Docker
-  - Builds TypeScript proxy
-  - Starts proxy server
-  - Launches Docker services with validated environment
+### Service Management
+- **start-all.ts** - Main startup script that validates environment, builds code, starts daemon and Docker services
+- **stop-all.ts** - Gracefully shuts down all services (Docker and daemon)
+- **status.ts** - Checks the health and status of all system components
 
-### stop-all.ts  
-- **Purpose**: Gracefully stops all services
-- **Usage**: `npm run stop:all` (from root directory)
-- **Features**:
-  - Stops Docker containers
-  - Terminates proxy server
-  - Cleans up PID files
+### Setup & Configuration
+- **setup.ts** - Initial project setup, installs dependencies, configures environment
+- **detect-tools.ts** - Detects available CLI tools (Claude, Gemini, etc.)
 
-### detect-tools.ts
-- **Purpose**: Detects available CLI tools (Claude, Gemini) and their paths
-- **Usage**: `node build/scripts/detect-tools.js`
-- **Features**:
-  - Finds Claude and Gemini CLI tools
-  - Tests if tools are executable
-  - Detects working shell path
+### Tunnel Support
+- **start-tunnel.ts** - Starts services with Cloudflare tunnel for remote access
+- **tunnel-status.ts** - Checks tunnel connection status and health
+- **test-tunnel-integrated.ts** - Integrated test runner for tunnel functionality
 
-### setup.sh
-- **Purpose**: Cloudflare Tunnel setup script (specific to deployment)
-- **Usage**: `./scripts/setup.sh` (when setting up Cloudflare tunnel)
-- **Note**: This is different from the root `setup.sh` which sets up the entire project
+### Internal Components
+- **daemon-control.ts** - Manages the host bridge daemon lifecycle
+- **docker-entrypoint.ts** - Docker container initialization script
 
-## Building Scripts
+## Usage
 
-All TypeScript scripts are compiled to the `build/scripts` directory:
+All scripts are compiled to JavaScript and run via npm scripts defined in package.json:
 
 ```bash
-npm run build:scripts
+npm run setup        # Initial setup
+npm run start        # Start all services
+npm run stop         # Stop all services
+npm run status       # Check system status
+npm run tunnel       # Start with tunnel
+npm run tunnel:status # Check tunnel status
+npm run test:tunnel  # Test tunnel connection
 ```
 
-## Archived Scripts
+## Archive Directory
 
-Old CommonJS and shell script versions have been moved to `scripts/archive/` for reference.
-These include:
-- claude-host-proxy.cjs
-- claude-host-proxy-streaming.cjs  
-- start-services.cjs
-- stop-services.cjs
-- host-claude.sh
-
-These have been replaced by the TypeScript proxy in `/proxy` and the TypeScript scripts above.
+The `archive/` subdirectory contains legacy CommonJS implementations preserved for reference during the TypeScript migration.

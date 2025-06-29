@@ -39,14 +39,15 @@ npm run test:tunnel
 
 ### Run full test suite against remote URL:
 ```bash
-# After starting tunnel, use the URL shown
+# Method 1: After starting tunnel, the URL is auto-detected
 cd e2e-test
 TUNNEL_MODE=true npm test
-```
 
-### Or specify URL directly:
-```bash
+# Method 2: Specify URL directly
 MCP_BASE_URL=https://your-tunnel.trycloudflare.com npm test
+
+# Method 3: Full automated test
+./test-tunnel-final.sh
 ```
 
 ## How It Works

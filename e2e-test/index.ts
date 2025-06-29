@@ -9,11 +9,13 @@
 import { testTools } from './typescript/test-tools.js';
 import { testPrompts } from './typescript/test-prompts.js';
 import { testResources } from './typescript/test-resources.js';
+import { MCP_BASE_URL } from './typescript/test-utils.js';
 
 const log = {
   title: (msg: string) => console.log(`\n\x1b[1m\x1b[35m${msg}\x1b[0m`),
   success: (msg: string) => console.log(`\x1b[32m✅\x1b[0m ${msg}`),
   error: (msg: string) => console.log(`\x1b[31m❌\x1b[0m ${msg}`),
+  info: (msg: string) => console.log(`\x1b[34mℹ\x1b[0m ${msg}`),
   section: (msg: string) => console.log(`\n${'='.repeat(60)}\n${msg}\n${'='.repeat(60)}`)
 };
 
@@ -30,6 +32,14 @@ const testSuites: TestSuite[] = [
 
 async function runAllTests(): Promise<void> {
   log.title('🚀 Coding Agent MCP Server E2E Test Suite');
+  
+  // Display connection info
+  if (MCP_BASE_URL.startsWith('https://')) {
+    log.info(`🌍 Using TUNNEL connection: ${MCP_BASE_URL}`);
+  } else {
+    log.info(`📡 Using LOCAL connection: ${MCP_BASE_URL}`);
+  }
+  
   log.section('Running all tests...');
   
   const results: { name: string; passed: boolean; error?: string }[] = [];

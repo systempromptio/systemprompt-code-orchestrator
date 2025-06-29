@@ -22,6 +22,9 @@ services:
       - CLAUDE_AVAILABLE=${CLAUDE_AVAILABLE:-false}
       - GIT_AVAILABLE=${GIT_AVAILABLE:-false}
       - GIT_CURRENT_BRANCH=${GIT_CURRENT_BRANCH:-none}
+      - TUNNEL_URL=${TUNNEL_URL}
+      - TUNNEL_ENABLED=${TUNNEL_ENABLED}
+      - PUBLIC_URL=${PUBLIC_URL}
       # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}  # Commented out - using authenticated user session
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     env_file:
@@ -40,15 +43,6 @@ services:
       - ${HOME}/.claude.json:/home/appuser/.claude.json:ro
     restart: unless-stopped
 
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
-    environment:
-      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
-    network_mode: "host"
-    depends_on:
-      - mcp-server
-    restart: unless-stopped
 
 volumes:
   coding-agent-state:

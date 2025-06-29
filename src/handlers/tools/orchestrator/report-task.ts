@@ -61,7 +61,7 @@ export const handleReportTask: ToolHandler<ReportTaskArgs> = async (
       const taskReport = formatTaskReport(task);
       
       return formatToolResponse({
-        message: `Task report for: ${task.title}`,
+        message: `Task report for: ${task.description}`,
         result: taskReport
       });
       
@@ -113,10 +113,8 @@ function formatTaskReport(task: Task) {
   
   return {
     id: task.id,
-    title: task.title,
     description: task.description,
     status: task.status,
-    branch: task.branch,
     tool: task.tool,
     created_at: task.created_at,
     updated_at: task.updated_at,

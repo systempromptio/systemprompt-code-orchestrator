@@ -11,6 +11,7 @@ import { testPrompts } from './test-prompts.js';
 import { testTools } from './test-tools.js';
 import { testResources } from './test-resources.js';
 import { testE2E } from './test-e2e.js';
+import { testTunnelConnection } from './test-tunnel.js';
 
 async function runAllTests(): Promise<void> {
   log.section('🧪 Running All E2E Tests');
@@ -23,6 +24,15 @@ async function runAllTests(): Promise<void> {
     await testTools();
     await testResources();
     await testE2E();
+    
+    // Check if we should run tunnel test
+    const tunnelUrl = process.env.MCP_BASE_URL || process.env.TUNNEL_URL;
+    if (tunnelUrl && tunnelUrl.startsWith('https://')) {
+      log.section('🌍 Running Tunnel Test');
+      await testTunnelConnection();
+    } else {
+      log.info('Skipping tunnel test (no TUNNEL_URL or MCP_BASE_URL set)');
+    }
     
     const duration = Date.now() - startTime;
     log.section(`✅ All tests completed in ${duration}ms`);

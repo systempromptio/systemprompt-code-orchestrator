@@ -158,8 +158,15 @@ class ProjectSetup {
             ? 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64'
             : 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64';
           
-          this.execCommand(`sudo wget -q ${downloadUrl} -O /usr/local/bin/cloudflared`);
-          this.execCommand('sudo chmod +x /usr/local/bin/cloudflared');
+          // Try without sudo first (for environments where user has write access)
+          if (!this.execCommand(`wget -q ${downloadUrl} -O /usr/local/bin/cloudflared 2>/dev/null`)) {
+            // If that fails, try with sudo
+            this.info('Attempting installation with sudo...');
+            this.execCommand(`sudo wget -q ${downloadUrl} -O /usr/local/bin/cloudflared`);
+            this.execCommand('sudo chmod +x /usr/local/bin/cloudflared');
+          } else {
+            this.execCommand('chmod +x /usr/local/bin/cloudflared');
+          }
         } else if (platform === 'win32') {
           this.error('Windows detected. Please install cloudflared manually from https://github.com/cloudflare/cloudflared/releases');
           return false;
@@ -275,7 +282,7 @@ CLAUDE_PROXY_HOST=host.docker.internal
 CLAUDE_PROXY_PORT=9876
 
 # MCP Server configuration
-MCP_PORT=3010
+MCP_PORT=3000
 HOST_FILE_ROOT=${hostFileRoot}
 
 # Tunnel configuration

@@ -21,7 +21,7 @@ export async function handleListResources(): Promise<ListResourcesResult> {
     tasks.forEach((task) => {
       resources.push({
         uri: `task://${task.id}`,
-        name: `Task: ${task.title}`,
+        name: `Task: ${task.description}`,
         mimeType: "application/json",
         description: `${task.description} (Status: ${task.status})`,
       });
@@ -88,9 +88,8 @@ export async function handleResourceCall(
                 count: tasks.length,
                 tasks: tasks.map((task) => ({
                   id: task.id,
-                  title: task.title,
+                  description: task.description,
                   status: task.status,
-                  branch: task.branch,
                   created_at: task.created_at,
                   updated_at: task.updated_at,
                 })),
@@ -135,10 +134,8 @@ export async function handleResourceCall(
             text: JSON.stringify(
               {
                 id: task.id,
-                title: task.title,
                 description: task.description,
                 status: task.status,
-                branch: task.branch,
                 started_at: task.started_at,
                 completed_at: task.completed_at,
                 assigned_to: task.assigned_to,
@@ -244,7 +241,8 @@ export async function handleResourceCall(
       if (uri.match(/^branch:\/\/[^\/]+\/tasks$/)) {
         const { branchName } = params;
         const tasks = await taskStore.getTasks();
-        const branchTasks = tasks.filter((t) => t.branch === branchName);
+        // Branch filtering removed - returning empty array
+        const branchTasks: typeof tasks = [];
         return {
           contents: [
             {
@@ -256,7 +254,7 @@ export async function handleResourceCall(
                   count: branchTasks.length,
                   tasks: branchTasks.map((t) => ({
                     id: t.id,
-                    title: t.title,
+                    description: t.description,
                     status: t.status,
                   })),
                 },
@@ -272,9 +270,8 @@ export async function handleResourceCall(
       if (uri.match(/^project:\/\/[^\/]+\/status$/)) {
         const { projectPath } = params;
         const tasks = await taskStore.getTasks();
-        const projectTasks = tasks.filter(
-          (t) => t.branch === projectPath || t.branch === decodeURIComponent(projectPath),
-        );
+        // Project filtering by branch removed - returning empty array
+        const projectTasks: typeof tasks = [];
         return {
           contents: [
             {

@@ -43,9 +43,8 @@ export async function getTaskOutputResource(uri: URL): Promise<Resource> {
     const output = {
       task: {
         id: task.id,
-        title: task.title,
+        description: task.description,
         status: task.status,
-        branch: task.branch,
         elapsed_seconds: 0, // Calculate from timestamps if needed
         created_at: task.created_at,
         updated_at: task.updated_at
@@ -66,7 +65,7 @@ export async function getTaskOutputResource(uri: URL): Promise<Resource> {
     
     return {
       uri: uri.toString(),
-      name: `Task Output: ${task.title}`,
+      name: `Task Output: ${task.description}`,
       description: `Complete output and progress for task ${taskId}`,
       mimeType: "application/json",
       text: JSON.stringify(output, null, 2)
@@ -92,8 +91,8 @@ export async function listTaskOutputResources(): Promise<Resource[]> {
   
   return activeTasks.map(task => ({
     uri: `task-output://task-output/${task.id}`,
-    name: `Task: ${task.title}`,
-    description: `Status: ${task.status}, Branch: ${task.branch}`,
+    name: `Task: ${task.description}`,
+    description: `Status: ${task.status}`,
     mimeType: "application/json"
   }));
 }

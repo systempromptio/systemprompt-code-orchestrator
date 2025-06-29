@@ -22,7 +22,7 @@ import {
  */
 interface EndTaskResult {
   task_id: string;
-  title: string;
+  description: string;
   status: string;
   duration_ms: number;
   logs: string[];
@@ -107,7 +107,7 @@ export const handleEndTask: ToolHandler<EndTaskArgs> = async (
     // Create result
     const result: EndTaskResult = {
       task_id: task.id,
-      title: task.title,
+      description: task.description,
       status: validated.status,
       duration_ms: duration,
       logs: task.logs || [],

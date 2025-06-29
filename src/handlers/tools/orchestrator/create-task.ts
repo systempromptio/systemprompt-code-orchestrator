@@ -6,17 +6,8 @@
 import type { ToolHandler, ToolHandlerContext, CallToolResult } from "../types.js";
 import { formatToolResponse } from "../types.js";
 import { logger } from "../../../utils/logger.js";
-import {
-  CreateTaskArgsSchema,
-  type CreateTaskArgs,
-  ToolNotAvailableError,
-} from "./utils/index.js";
-import {
-  validateInput,
-  isToolAvailable,
-  agentOperations,
-  taskOperations,
-} from "./utils/index.js";
+import { CreateTaskArgsSchema, type CreateTaskArgs, ToolNotAvailableError } from "./utils/index.js";
+import { validateInput, isToolAvailable, agentOperations, taskOperations } from "./utils/index.js";
 
 /**
  * Creates a new task and optionally starts an AI session to execute it
@@ -42,18 +33,19 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (
     // Validate input
     const validated = validateInput(CreateTaskArgsSchema, args);
 
+    // Default tool to CLAUDECODE if not provided
+    const tool = validated.tool || 'CLAUDECODE';
+    
     // Check tool availability
-    if (!isToolAvailable(validated.tool)) {
-      throw new ToolNotAvailableError(validated.tool);
+    if (!isToolAvailable(tool)) {
+      throw new ToolNotAvailableError(tool);
     }
 
     const projectPath = process.env.PROJECT_ROOT || "/workspace";
     const task = await taskOperations.createTask(
       {
-        title: validated.title,
         description: validated.instructions,
-        tool: validated.tool,
-        branch: "", // No longer using branches
+        tool: tool,
         projectPath,
       },
       context?.sessionId,
@@ -69,7 +61,7 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (
       });
 
       // Start agent session without git branch setup
-      const agentResult = await agentOperations.startAgentForTask(validated.tool, task, {
+      const agentResult = await agentOperations.startAgentForTask(tool, task, {
         workingDirectory: projectPath,
         branch: "", // No branch needed
         sessionId: context?.sessionId,
@@ -78,11 +70,7 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (
       agentSessionId = agentResult.sessionId;
 
       // Update task with agent assignment
-      await taskOperations.updateTask(
-        task.id,
-        { assigned_to: agentSessionId },
-        context?.sessionId,
-      );
+      await taskOperations.updateTask(task.id, { assigned_to: agentSessionId }, context?.sessionId);
 
       // Execute initial instructions asynchronously if provided
       if (validated.instructions) {
@@ -91,9 +79,9 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (
           agentSessionId,
           validated.instructions,
           task.id,
-          validated.tool,
+          tool,
           context?.sessionId,
-        ).catch(error => {
+        ).catch((error) => {
           logger.error("Background instruction execution failed", { error, taskId: task.id });
           taskOperations.addTaskLog(
             task.id,
@@ -101,11 +89,11 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (
             context?.sessionId,
           );
         });
-        
+
         // Log that we're starting asynchronously
         await taskOperations.addTaskLog(
           task.id,
-          `[ASYNC_START] Started ${validated.tool} process in background`,
+          `[ASYNC_START] Started ${tool} process in background`,
           context?.sessionId,
         );
       }
@@ -133,9 +121,9 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (
       message: `Task spawned successfully with ID ${task.id}`,
       result: {
         task_id: task.id,
-        title: task.title,
+        description: task.description,
         status: "in_progress",
-        tool: validated.tool,
+        tool: tool,
         session_id: agentSessionId,
         instructions_started: !!validated.instructions,
         created_at: task.created_at,
@@ -175,7 +163,11 @@ async function executeInitialInstructions(
 
     // Set up progress handlers for Claude
     if (tool === "CLAUDECODE") {
-      cleanup = agentOperations.setupClaudeProgressHandlers(taskId, sessionId || '', agentSessionId);
+      cleanup = agentOperations.setupClaudeProgressHandlers(
+        taskId,
+        sessionId || "",
+        agentSessionId,
+      );
     }
 
     // Execute instructions
@@ -201,11 +193,7 @@ async function executeInitialInstructions(
       );
 
       if (result.output) {
-        await taskOperations.addTaskLog(
-          taskId,
-          `[${tool}_OUTPUT]\n${result.output}`,
-          sessionId,
-        );
+        await taskOperations.addTaskLog(taskId, `[${tool}_OUTPUT]\n${result.output}`, sessionId);
       }
     } else {
       await taskOperations.updateTaskStatus(taskId, "failed", sessionId, {
@@ -216,11 +204,7 @@ async function executeInitialInstructions(
     return result;
   } catch (error) {
     logger.error("Failed to execute instructions", { error, taskId });
-    await taskOperations.addTaskLog(
-      taskId,
-      `[ERROR] Instructions error: ${error}`,
-      sessionId,
-    );
+    await taskOperations.addTaskLog(taskId, `[ERROR] Instructions error: ${error}`, sessionId);
     throw error;
   } finally {
     if (cleanup) {

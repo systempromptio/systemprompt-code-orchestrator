@@ -41,6 +41,7 @@ async function sleep(ms: number): Promise<void> {
 async function runInteractiveTask(client: Client, reporter: TestReporter): Promise<boolean> {
   const timestamp = Date.now();
   let taskComplete = false;
+  let executionComplete = false;
   let taskId: string | null = null;
   let sessionId: string | null = null;
   const notifications: Array<{timestamp: string, type: string, data: any}> = [];
@@ -104,10 +105,23 @@ async function runInteractiveTask(client: Client, reporter: TestReporter): Promi
         if (taskResource.contents?.[0]?.text) {
           const taskInfo = JSON.parse(taskResource.contents[0].text as string);
           
-          // Update progress
+          // Update progress with more detail
           const statusSymbol = taskInfo.status === 'completed' ? '✅' : 
                               taskInfo.status === 'failed' ? '❌' : '⏳';
-          process.stdout.write(`\r${statusSymbol} Status: ${taskInfo.status} | Progress: ${taskInfo.progress || 0}%`);
+          const logCount = taskInfo.logs?.length || 0;
+          const lastLog = taskInfo.logs?.[taskInfo.logs.length - 1] || '';
+          
+          // Clear line and show detailed progress
+          process.stdout.write('\r' + ' '.repeat(100) + '\r');
+          process.stdout.write(`${statusSymbol} Status: ${taskInfo.status} | Logs: ${logCount} | Progress: ${taskInfo.progress || 0}%`);
+          
+          // Log important state changes
+          if (lastLog.includes('[STATUS_CHANGE]') || 
+              lastLog.includes('[EXECUTION_SUCCESS]') || 
+              lastLog.includes('[SESSION_CREATED]') ||
+              lastLog.includes('[INSTRUCTIONS_SENDING]')) {
+            console.log(`\n📍 ${lastLog}`);
+          }
           
           if (taskId) {
             reporter.addLog(taskId, `Task Status: ${taskInfo.status}, Progress: ${taskInfo.progress}%`, 'STATUS_UPDATE');
@@ -119,6 +133,20 @@ async function runInteractiveTask(client: Client, reporter: TestReporter): Promi
             recentLogs.forEach((logLine: string) => {
               if (!logLine.includes('[STATUS_UPDATE]') && taskId) {
                 reporter.addLog(taskId, logLine, 'TASK_LOG');
+                
+                // Check if agent execution completed
+                if (logLine.includes('[EXECUTION_SUCCESS]')) {
+                  console.log('\n\n✨ Agent execution completed successfully!');
+                  console.log('📝 Marking as complete for test purposes...');
+                  executionComplete = true; // Track execution completion separately
+                }
+                
+                // Log other important events
+                if (logLine.includes('[COMMAND_SENT]')) {
+                  console.log(`\n📤 ${logLine}`);
+                } else if (logLine.includes('[CLAUDECODE_OUTPUT]')) {
+                  console.log(`\n📥 Claude completed execution`);
+                }
               }
             });
           }
@@ -189,12 +217,15 @@ async function runInteractiveTask(client: Client, reporter: TestReporter): Promi
     const maxWaitTime = 120000; // 2 minutes
     const startTime = Date.now();
     
-    while (!taskComplete && (Date.now() - startTime) < maxWaitTime) {
+    while (!executionComplete && !taskComplete && (Date.now() - startTime) < maxWaitTime) {
       await sleep(1000);
     }
     
-    if (!taskComplete) {
-      console.log('\n⚠️  Task did not complete within timeout period');
+    if (!executionComplete && !taskComplete) {
+      console.log('\n\n⚠️  Agent did not complete execution within timeout period');
+      console.log('    The task may still be running in the background.');
+    } else if (executionComplete) {
+      console.log('\n\n✅ Execution completed! Getting final results...');
     }
     
     // Get final task state
@@ -236,15 +267,49 @@ async function runInteractiveTask(client: Client, reporter: TestReporter): Promi
       }
     }
     
+    // Check for created files based on instructions
+    if (instructions.toLowerCase().includes('html')) {
+      console.log('\n🔍 Looking for created HTML files...');
+      try {
+        const { execSync } = await import('child_process');
+        const projectRoot = process.env.PROJECT_ROOT || '/var/www/html/systemprompt-coding-agent';
+        const htmlFiles = execSync('find . -name "*.html" -type f -mmin -5 | head -10', {
+          cwd: projectRoot,
+          encoding: 'utf8'
+        }).trim();
+        
+        if (htmlFiles) {
+          console.log('📄 Recently created HTML files:');
+          htmlFiles.split('\n').forEach(file => {
+            console.log(`    ${file}`);
+          });
+          
+          // Show content of the most recent file
+          const mostRecent = htmlFiles.split('\n')[0];
+          if (mostRecent) {
+            console.log(`\n📋 Content preview of ${mostRecent}:`);
+            const fsModule = await import('fs/promises');
+            const content = await fsModule.readFile(path.join(projectRoot, mostRecent), 'utf8');
+            console.log('─'.repeat(60));
+            console.log(content.substring(0, 500) + (content.length > 500 ? '...' : ''));
+            console.log('─'.repeat(60));
+          }
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+    
     // End the task
     if (taskId) {
+      console.log('\n📝 Ending task...');
       await client.callTool({
         name: 'end_task',
         arguments: {
           task_id: taskId
         }
       });
-      console.log('\n✅ Task ended successfully');
+      console.log('✅ Task ended successfully');
     }
     
     // Complete test report

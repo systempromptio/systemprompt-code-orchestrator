@@ -61,11 +61,11 @@ export const handleCleanState: ToolHandler<CleanStateArgs> = async (
       
       logger.info('Deleted task', {
         taskId: validated.task_id,
-        title: task.title
+        description: task.description
       });
       
       return formatToolResponse({
-        message: `Deleted task: ${task.title} (${validated.task_id})`,
+        message: `Deleted task: ${task.description} (${validated.task_id})`,
         result: {
           deleted_tasks: 1,
           task_ids: [validated.task_id]

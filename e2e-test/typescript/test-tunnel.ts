@@ -6,16 +6,18 @@
  * Test to verify connection to MCP server via tunnel URL
  */
 
-import { createMCPClient, log } from './test-utils.js';
+import { createMCPClient, log, MCP_BASE_URL } from './test-utils.js';
 
 async function testTunnelConnection(): Promise<void> {
   log.section('🌍 Testing Tunnel Connection');
   
-  // Check if we're using a tunnel URL
-  const url = process.env.MCP_BASE_URL || process.env.TUNNEL_URL;
+  // Get the base URL from test-utils (which handles detection)
+  const url = MCP_BASE_URL;
+  
   if (!url || !url.startsWith('https://')) {
-    log.warning('No tunnel URL detected. Set TUNNEL_URL or MCP_BASE_URL environment variable.');
-    log.info('Example: TUNNEL_URL=https://example.trycloudflare.com npm run test:tunnel');
+    log.warning('No tunnel URL detected!');
+    log.info('The tunnel should be started automatically by npm run test:tunnel');
+    log.info('Or set MCP_BASE_URL=https://your-tunnel.trycloudflare.com');
     process.exit(1);
   }
   

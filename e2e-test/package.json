@@ -6,6 +6,8 @@
   "scripts": {
     "build": "tsc",
     "test": "npm run build && node dist/index.js",
+    "test:tunnel": "npm run build && node dist/run-with-tunnel.js",
+    "test:tunnel-only": "npm run build && node dist/typescript/test-tunnel.js",
     "test:e2e": "npm run build && node dist/typescript/test-simple-task.js",
     "test:unit": "npm run build && node dist/index.js",
     "test:tools": "npm run build && node dist/typescript/test-tools.js",
@@ -13,7 +15,6 @@
     "test:resources": "npm run build && node dist/typescript/test-resources.js",
     "test:simple": "npm run build && node dist/typescript/test-simple-task.js",
     "test:interactive": "npm run build && node dist/typescript/test-interactive.js",
-    "test:tunnel": "npm run build && node dist/typescript/test-tunnel.js",
     "clean": "rm -rf dist node_modules",
     "lint": "tsc --noEmit"
   },
