@@ -132,7 +132,7 @@ export class StatePersistence extends EventEmitter {
   
   async saveTask(task: Task): Promise<void> {
     if (this.config.type === 'filesystem') {
-      const taskFile = path.join(this.statePath, 'tasks', `${task.id}.json`);
+      const taskFile = path.join(this.statePath, 'tasks', `task_${task.id}.json`);
       
       try {
         await fs.writeFile(
