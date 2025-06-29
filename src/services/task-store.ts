@@ -148,7 +148,6 @@ export class TaskStore extends EventEmitter {
 
       // Send MCP notification for log update to the correct session
       await sendResourcesUpdatedNotification(`task://${taskId}`, sessionId);
-      await sendResourcesUpdatedNotification(`task://${taskId}/logs`, sessionId);
     }
   }
 
