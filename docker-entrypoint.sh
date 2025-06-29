@@ -22,6 +22,12 @@ export PORT=${PORT:-3000}
 export STATE_PATH=${STATE_PATH:-/data/state}
 export PROJECTS_PATH=${PROJECTS_PATH:-/data/projects}
 
+# Pass through tunnel URL if set
+if [ -n "$TUNNEL_URL" ]; then
+    export PUBLIC_URL=${TUNNEL_URL}
+    echo "- Using tunnel URL: $TUNNEL_URL"
+fi
+
 # Unset ANTHROPIC_API_KEY to use authenticated session
 unset ANTHROPIC_API_KEY
 echo "- Using Claude authenticated session (ANTHROPIC_API_KEY unset)"

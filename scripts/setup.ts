@@ -131,6 +131,58 @@ class ProjectSetup {
     }
   }
   
+  async checkCloudflared(): Promise<boolean> {
+    this.header('Checking Cloudflare Tunnel (cloudflared)');
+    
+    const cloudflaredPath = this.checkCommand('cloudflared');
+    
+    if (!cloudflaredPath) {
+      this.info('Cloudflared not found. Installing...');
+      
+      // Detect OS and install cloudflared
+      const platform = process.platform;
+      const arch = process.arch;
+      
+      try {
+        if (platform === 'darwin') {
+          // macOS
+          if (this.checkCommand('brew')) {
+            this.execCommand('brew install cloudflared');
+          } else {
+            this.error('Please install Homebrew first or manually install cloudflared');
+            return false;
+          }
+        } else if (platform === 'linux') {
+          // Linux
+          const downloadUrl = arch === 'arm64' 
+            ? 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64'
+            : 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64';
+          
+          this.execCommand(`sudo wget -q ${downloadUrl} -O /usr/local/bin/cloudflared`);
+          this.execCommand('sudo chmod +x /usr/local/bin/cloudflared');
+        } else if (platform === 'win32') {
+          this.error('Windows detected. Please install cloudflared manually from https://github.com/cloudflare/cloudflared/releases');
+          return false;
+        }
+        
+        // Verify installation
+        if (this.checkCommand('cloudflared')) {
+          this.success('Cloudflared installed successfully');
+          return true;
+        }
+      } catch (error) {
+        this.warning('Failed to install cloudflared automatically. Please install manually.');
+        this.info('Visit: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/');
+        return false;
+      }
+    } else {
+      this.success(`Cloudflared found at: ${cloudflaredPath}`);
+      return true;
+    }
+    
+    return false;
+  }
+  
   async createDirectories(): Promise<void> {
     this.header('Creating project directories');
     
@@ -198,7 +250,7 @@ class ProjectSetup {
     return true;
   }
   
-  async createEnvironmentFile(claudePath: string | null, claudeAvailable: boolean): Promise<void> {
+  async createEnvironmentFile(claudePath: string | null, claudeAvailable: boolean, cloudflaredAvailable: boolean): Promise<void> {
     this.header('Setting up environment');
     
     const envPath = path.join(projectRoot, '.env');
@@ -226,6 +278,11 @@ CLAUDE_PROXY_PORT=9876
 MCP_PORT=3010
 HOST_FILE_ROOT=${hostFileRoot}
 
+# Tunnel configuration
+TUNNEL_ENABLED=${cloudflaredAvailable}
+TUNNEL_PROVIDER=cloudflare
+# TUNNEL_URL will be dynamically set when tunnel starts
+
 # Optional: Anthropic API key (if not using daemon)
 # ANTHROPIC_API_KEY=your-key-here
 
@@ -251,6 +308,9 @@ LOG_LEVEL=info
     // Check Claude
     const claude = await this.checkClaude();
     
+    // Check Cloudflared
+    const cloudflaredAvailable = await this.checkCloudflared();
+    
     // Create directories
     await this.createDirectories();
     
@@ -267,7 +327,7 @@ LOG_LEVEL=info
     }
     
     // Create environment file
-    await this.createEnvironmentFile(claude.path, claude.available);
+    await this.createEnvironmentFile(claude.path, claude.available, cloudflaredAvailable);
     
     // Final summary
     this.header('Setup Complete!');
@@ -279,12 +339,17 @@ LOG_LEVEL=info
     
     this.info('\nQuick start commands:');
     this.success('  npm start          # Start all services');
+    this.success('  npm run tunnel     # Start services with internet tunnel');
     this.success('  npm test           # Run all tests');
     this.success('  npm run logs       # View logs');
     
     if (!claude.available) {
       this.warning('\nNote: Claude CLI is not available. The daemon will not work.');
       this.warning('Install Claude CLI to enable full functionality.');
+    }
+    
+    if (cloudflaredAvailable) {
+      this.success('\n✨ Cloudflare tunnel is available! Use "npm run tunnel" to expose your server.');
     }
   }
 }

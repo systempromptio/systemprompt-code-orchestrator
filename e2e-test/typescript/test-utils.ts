@@ -13,7 +13,43 @@ import { config } from 'dotenv';
 // Load environment configuration
 config({ path: '.env' });
 
-export const MCP_BASE_URL = process.env.MCP_BASE_URL || `http://127.0.0.1:${process.env.PORT || '3000'}`;
+// Check for tunnel URL in multiple places
+function getMCPBaseUrl(): string {
+  // 1. Check for explicit MCP_BASE_URL
+  if (process.env.MCP_BASE_URL) {
+    return process.env.MCP_BASE_URL;
+  }
+  
+  // 2. Check if we're in tunnel mode
+  if (process.env.TUNNEL_MODE === 'true' || process.env.TUNNEL_ENABLED === 'true') {
+    // Try to read tunnel URL from file
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const tunnelFile = path.join(__dirname, '../../../.tunnel-url');
+      if (fs.existsSync(tunnelFile)) {
+        const tunnelUrl = fs.readFileSync(tunnelFile, 'utf8').trim();
+        console.log(`Using tunnel URL from file: ${tunnelUrl}`);
+        return tunnelUrl;
+      }
+    } catch (e) {
+      console.warn('Failed to read tunnel URL file:', e);
+    }
+    
+    // Check environment variable
+    if (process.env.TUNNEL_URL) {
+      console.log(`Using tunnel URL from env: ${process.env.TUNNEL_URL}`);
+      return process.env.TUNNEL_URL;
+    }
+    
+    console.warn('Tunnel mode enabled but no tunnel URL found');
+  }
+  
+  // 3. Default to local URL
+  return `http://127.0.0.1:${process.env.PORT || '3000'}`;
+}
+
+export const MCP_BASE_URL = getMCPBaseUrl();
 
 /**
  * Colored console output utilities
@@ -70,7 +106,13 @@ export class TestTracker {
  * Create and connect MCP client
  */
 export async function createMCPClient(enableNotifications = false): Promise<Client> {
-  log.debug(`Connecting to MCP server at ${MCP_BASE_URL}`);
+  const isRemote = MCP_BASE_URL.startsWith('https://');
+  
+  if (isRemote) {
+    log.info(`🌍 Connecting to REMOTE MCP server at ${MCP_BASE_URL}`);
+  } else {
+    log.debug(`Connecting to local MCP server at ${MCP_BASE_URL}`);
+  }
   
   const transport = new StreamableHTTPClientTransport(
     new URL('/mcp', MCP_BASE_URL),
@@ -109,7 +151,13 @@ export async function createMCPClient(enableNotifications = false): Promise<Clie
   );
   
   await Promise.race([connectPromise, timeoutPromise]);
-  log.debug('Successfully connected to MCP server');
+  
+  if (isRemote) {
+    log.success('✨ Successfully connected to REMOTE MCP server');
+  } else {
+    log.debug('Successfully connected to local MCP server');
+  }
+  
   return client;
 }
 

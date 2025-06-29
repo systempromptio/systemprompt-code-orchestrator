@@ -12,6 +12,8 @@
     "test:prompts": "npm run build && node dist/typescript/test-prompts.js",
     "test:resources": "npm run build && node dist/typescript/test-resources.js",
     "test:simple": "npm run build && node dist/typescript/test-simple-task.js",
+    "test:interactive": "npm run build && node dist/typescript/test-interactive.js",
+    "test:tunnel": "npm run build && node dist/typescript/test-tunnel.js",
     "clean": "rm -rf dist node_modules",
     "lint": "tsc --noEmit"
   },

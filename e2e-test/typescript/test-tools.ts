@@ -138,8 +138,12 @@ export async function testTools(): Promise<void> {
 
 // Run if executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  testTools().catch(error => {
-    log.error(`Fatal error: ${error}`);
-    process.exit(1);
-  });
+  testTools()
+    .then(() => {
+      process.exit(0);
+    })
+    .catch(error => {
+      log.error(`Fatal error: ${error}`);
+      process.exit(1);
+    });
 }

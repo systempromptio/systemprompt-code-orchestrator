@@ -85,8 +85,12 @@ export async function testResources(): Promise<void> {
 
 // Run if executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  testResources().catch(error => {
-    log.error(`Fatal error: ${error}`);
-    process.exit(1);
-  });
+  testResources()
+    .then(() => {
+      process.exit(0);
+    })
+    .catch(error => {
+      log.error(`Fatal error: ${error}`);
+      process.exit(1);
+    });
 }

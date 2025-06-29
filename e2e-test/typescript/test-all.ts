@@ -36,8 +36,12 @@ async function runAllTests(): Promise<void> {
 
 // Run if executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  runAllTests().catch(error => {
-    log.error(`Fatal error: ${error}`);
-    process.exit(1);
-  });
+  runAllTests()
+    .then(() => {
+      process.exit(0);
+    })
+    .catch(error => {
+      log.error(`Fatal error: ${error}`);
+      process.exit(1);
+    });
 }

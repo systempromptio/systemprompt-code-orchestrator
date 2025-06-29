@@ -4,7 +4,7 @@
  * 
  * @remarks
  * Tests the complete flow of creating, monitoring, and updating a task using the create_task tool
- * with resource change notifications
+ * with resource change notifications and comprehensive reporting
  */
 
 import { createMCPClient, log, TestTracker, runTest } from './test-utils.js';
@@ -13,20 +13,27 @@ import {
   ResourceListChangedNotificationSchema,
   ResourceUpdatedNotificationSchema
 } from '@modelcontextprotocol/sdk/types.js';
+import { TestReporter } from './test-reporter.js';
+import * as path from 'path';
 
 async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
- * Test the complete create_task flow with notifications
+ * Test the complete create_task flow with notifications and reporting
  */
-async function testCreateTaskFlow(client: Client): Promise<void> {
+async function testCreateTaskFlow(client: Client, reporter: TestReporter): Promise<void> {
   const timestamp = Date.now();
   let taskComplete = false;
   let taskId: string | null = null;
   let sessionId: string | null = null;
   const notifications: Array<{timestamp: string, type: string, data: any}> = [];
+  
+  // Define test parameters
+  const testName = 'Create Hello World HTML';
+  const branchName = `e2e-test-${timestamp}`;
+  const instructions = 'Create a file named hello.html with a basic HTML page that displays "Hello World" as a heading';
   
   // Set up notification handlers BEFORE creating the task
   client.setNotificationHandler(ResourceListChangedNotificationSchema, (notification) => {
@@ -37,6 +44,11 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
     };
     notifications.push(notif);
     log.info(`📢 [${notif.timestamp}] Resource list changed`);
+    
+    // Add to reporter if task is started
+    if (taskId) {
+      reporter.addNotification(taskId, 'ResourceListChanged', notification);
+    }
   });
   
   client.setNotificationHandler(ResourceUpdatedNotificationSchema, async (notification) => {
@@ -48,6 +60,11 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
     notifications.push(notif);
     log.info(`📢 [${notif.timestamp}] Resource updated: ${notification.params.uri}`);
     
+    // Add to reporter
+    if (taskId) {
+      reporter.addNotification(taskId, 'ResourceUpdated', notification.params);
+    }
+    
     // If it's our task, read the updated resource
     if (taskId && notification.params.uri === `task://${taskId}`) {
       try {
@@ -56,11 +73,18 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
           const taskInfo = JSON.parse(taskResource.contents[0].text as string);
           log.info(`  📊 Task Status: ${taskInfo.status}, Progress: ${taskInfo.progress}%`);
           
-          // Show recent logs
+          // Add status update to reporter
+          reporter.addLog(taskId, `Task Status: ${taskInfo.status}, Progress: ${taskInfo.progress}%`, 'STATUS_UPDATE');
+          
+          // Show recent logs and add them to reporter
           if (taskInfo.logs && taskInfo.logs.length > 0) {
             const recentLogs = taskInfo.logs.slice(-2);
             recentLogs.forEach((logLine: string) => {
               log.debug(`  📝 ${logLine}`);
+              // Parse and add to reporter if it's a new log
+              if (!logLine.includes('[STATUS_UPDATE]') && taskId) {
+                reporter.addLog(taskId, logLine, 'TASK_LOG');
+              }
             });
           }
           
@@ -68,23 +92,24 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
           if (taskInfo.status === 'completed' || taskInfo.status === 'failed') {
             taskComplete = true;
             log.info(`  ✅ Task ${taskInfo.status}!`);
+            reporter.addLog(taskId, `Task ${taskInfo.status}`, 'TASK_COMPLETE');
           }
         }
       } catch (error) {
         log.debug(`  ⚠️ Could not read updated resource: ${error}`);
+        reporter.addLog(taskId, `Could not read updated resource: ${error}`, 'ERROR');
       }
     }
   });
   
   // Step 1: Create a task
   log.debug('Creating task with CLAUDECODE tool...');
-  const branchName = `e2e-test-${timestamp}`;
   const createResult = await client.callTool({
     name: 'create_task',
     arguments: {
-      title: 'E2E Test Task',
+      title: testName,
       tool: 'CLAUDECODE',
-      instructions: 'Create a hello world HTML file called hello.html with the content: <!DOCTYPE html><html><body><h1>Hello World!</h1></body></html>',
+      instructions: instructions,
       branch: branchName
     }
   });
@@ -111,6 +136,18 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
   log.debug(`Session ID: ${sessionId || 'none'}`);
   log.debug(`Tool: ${taskData.result.tool}`);
   log.debug(`Status: ${taskData.result.status}`);
+  
+  // Start test report (taskId is guaranteed to be non-null here after the check above)
+  reporter.startTest(testName, taskId!, {
+    tool: 'CLAUDECODE',
+    branch: branchName,
+    instructions: instructions,
+    sessionId: sessionId || undefined
+  });
+  
+  reporter.addLog(taskId!, `Task created successfully with ID: ${taskId}`, 'TASK_CREATED');
+  reporter.addLog(taskId!, `Session ID: ${sessionId || 'none'}`, 'SESSION_INFO');
+  reporter.addLog(taskId!, `Branch: ${branchName}`, 'BRANCH_INFO');
   
   // Step 2: Task resource URI for monitoring
   const taskUri = `task://${taskId}`;
@@ -166,12 +203,30 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
   // Step 5: Wait for task completion via notifications (with timeout)
   if (!taskComplete) {
     log.info('⏳ Waiting for task completion via notifications...');
-    const maxWaitTime = 120000; // 2 minutes
+    const maxWaitTime = 30000; // 30 seconds
     const startTime = Date.now();
     
     while (!taskComplete && (Date.now() - startTime) < maxWaitTime) {
       await sleep(1000);
       // Task completion is handled by notification handler
+    }
+    
+    // If still not complete, check one more time
+    if (!taskComplete) {
+      try {
+        const checkResource = await client.readResource({ uri: taskUri });
+        if (checkResource.contents?.[0]?.text) {
+          const taskInfo = JSON.parse(checkResource.contents[0].text as string);
+          if (taskInfo.status === 'completed' || taskInfo.status === 'failed') {
+            taskComplete = true;
+            if (taskId) {
+              reporter.addLog(taskId, `Task ${taskInfo.status} (final check)`, 'TASK_COMPLETE');
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore
+      }
     }
   }
   
@@ -188,11 +243,15 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
       log.info(`Progress: ${final.progress}%`);
       log.info(`Total logs: ${final.logs?.length || 0}`);
       
-      // Show all logs
+      // Add all logs to reporter
       if (final.logs && final.logs.length > 0) {
         log.info('Task logs:');
         final.logs.forEach((logLine: string, idx: number) => {
           log.debug(`  ${idx + 1}. ${logLine}`);
+          // Add to reporter if not already added
+          if (taskId) {
+            reporter.addLog(taskId, logLine, 'FINAL_LOG');
+          }
         });
       }
       
@@ -276,12 +335,20 @@ async function testCreateTaskFlow(client: Client): Promise<void> {
   } catch (error) {
     log.debug('Could not check git branches');
   }
+  
+  // Complete test report
+  if (taskId) {
+    await reporter.completeTest(taskId, {
+      success: taskComplete,
+      output: `Task ${taskComplete ? 'completed' : 'did not complete'} successfully`
+    });
+  }
 }
 
 /**
  * Test error handling in create_task
  */
-async function testCreateTaskErrorHandling(client: Client): Promise<void> {
+async function testCreateTaskErrorHandling(client: Client, _reporter: TestReporter): Promise<void> {
   // Test with invalid tool
   try {
     await client.callTool({
@@ -320,16 +387,28 @@ export async function testE2E(): Promise<void> {
   log.section('🚀 Testing E2E create_task Flow');
   
   const tracker = new TestTracker();
+  const reporter = new TestReporter(process.env.PROJECT_ROOT || process.cwd());
   let client: Client | null = null;
   
   try {
     client = await createMCPClient(true); // Enable notifications
     log.success('Connected to MCP server with notifications enabled');
     
-    await runTest('Create Task Flow', () => testCreateTaskFlow(client!), tracker);
-    await runTest('Error Handling', () => testCreateTaskErrorHandling(client!), tracker);
+    await runTest('Create Task Flow', () => testCreateTaskFlow(client!, reporter), tracker);
+    await runTest('Error Handling', () => testCreateTaskErrorHandling(client!, reporter), tracker);
     
     tracker.printSummary();
+    
+    // Generate and save reports
+    log.section('📊 Generating Test Reports');
+    reporter.printSummary();
+    
+    const reportDir = path.join(process.cwd(), 'test-reports');
+    const { html, markdown } = await reporter.saveReports(reportDir);
+    
+    log.success(`\n📄 Reports saved:`);
+    log.info(`  HTML: ${html}`);
+    log.info(`  Markdown: ${markdown}`);
     
   } catch (error) {
     log.error(`Test suite failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -343,8 +422,12 @@ export async function testE2E(): Promise<void> {
 
 // Run if executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  testE2E().catch(error => {
-    log.error(`Fatal error: ${error}`);
-    process.exit(1);
-  });
+  testE2E()
+    .then(() => {
+      process.exit(0);
+    })
+    .catch(error => {
+      log.error(`Fatal error: ${error}`);
+      process.exit(1);
+    });
 }

@@ -32,6 +32,9 @@ interface ValidatedEnvironment {
   HOST_FILE_ROOT: string;
   GIT_AVAILABLE: string;
   GIT_CURRENT_BRANCH: string;
+  TUNNEL_URL?: string;
+  TUNNEL_ENABLED?: string;
+  PUBLIC_URL?: string;
   errors: string[];
 }
 
@@ -166,6 +169,16 @@ class StartupManager {
           }
         }
       });
+    }
+    
+    // Check for tunnel environment variables
+    if (process.env.TUNNEL_URL) {
+      env.TUNNEL_URL = process.env.TUNNEL_URL;
+      env.TUNNEL_ENABLED = 'true';
+      env.PUBLIC_URL = process.env.TUNNEL_URL;
+      this.success(`Using tunnel URL: ${env.TUNNEL_URL}`);
+    } else if (process.env.TUNNEL_ENABLED === 'true') {
+      this.info('Tunnel enabled but no URL provided yet');
     }
     
     env.errors = errors;
