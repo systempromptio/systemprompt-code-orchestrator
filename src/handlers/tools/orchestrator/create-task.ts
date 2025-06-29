@@ -63,7 +63,6 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (
 
     // Initialize result
     let agentSessionId: string | null = null;
-    let commandResult: any = null;
     let branchCreated = false;
 
     try {
@@ -90,23 +89,38 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (
 
       agentSessionId = agentResult.sessionId;
 
-      // Execute initial instructions if provided
-      if (validated.instructions) {
-        commandResult = await executeInitialInstructions(
-          agentSessionId,
-          validated.instructions,
-          task.id,
-          validated.tool,
-          context?.sessionId,
-        );
-      }
-
       // Update task with agent assignment
       await taskOperations.updateTask(
         task.id,
         { assigned_to: agentSessionId },
         context?.sessionId,
       );
+
+      // Execute initial instructions asynchronously if provided
+      if (validated.instructions) {
+        // Start execution in background - don't await
+        executeInitialInstructions(
+          agentSessionId,
+          validated.instructions,
+          task.id,
+          validated.tool,
+          context?.sessionId,
+        ).catch(error => {
+          logger.error("Background instruction execution failed", { error, taskId: task.id });
+          taskOperations.addTaskLog(
+            task.id,
+            `[ERROR] Background execution failed: ${error}`,
+            context?.sessionId,
+          );
+        });
+        
+        // Log that we're starting asynchronously
+        await taskOperations.addTaskLog(
+          task.id,
+          `[ASYNC_START] Started ${validated.tool} process in background`,
+          context?.sessionId,
+        );
+      }
 
       logger.info("Task created successfully", {
         taskId: task.id,
@@ -129,16 +143,16 @@ export const handleCreateTask: ToolHandler<CreateTaskArgs> = async (
 
     // Return success response
     return formatToolResponse({
-      message: `Task created successfully${agentSessionId ? " and started" : ""}`,
+      message: `Task spawned successfully with ID ${task.id}`,
       result: {
         task_id: task.id,
         title: task.title,
-        status: task.status,
+        status: "in_progress",
         tool: validated.tool,
         session_id: agentSessionId,
         branch: validated.branch,
         branch_created: branchCreated,
-        initial_command_result: commandResult,
+        instructions_started: !!validated.instructions,
         created_at: task.created_at,
       },
     });
@@ -230,9 +244,13 @@ async function executeInitialInstructions(
     );
 
     if (result.success) {
-      await taskOperations.updateTaskStatus(taskId, "completed", sessionId, {
-        result: result.output,
-      });
+      // Don't mark as completed - let end-task handle that
+      // Just log the successful execution
+      await taskOperations.addTaskLog(
+        taskId,
+        `[EXECUTION_SUCCESS] Initial instructions completed successfully`,
+        sessionId,
+      );
 
       if (result.output) {
         await taskOperations.addTaskLog(
