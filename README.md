@@ -16,20 +16,6 @@
 
 <div align="center">
   
-  ### 🎥 See It In Action
-  
-  <a href="https://www.loom.com/share/8e4b8631d1a149d9801f2b96235dcd0b">
-    <img src="https://cdn.loom.com/sessions/thumbnails/8e4b8631d1a149d9801f2b96235dcd0b-with-play.gif" alt="Watch Demo Video" width="600">
-  </a>
-  
-  **[Watch the full demo video](https://www.loom.com/share/8e4b8631d1a149d9801f2b96235dcd0b)** to see how SystemPrompt Coding Agent works!
-  
-</div>
-
----
-
-<div align="center">
-  
   ### 💯 100% Free and Open Source
   
   **We appreciate your support!** If you find this project useful, please consider:
