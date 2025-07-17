@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/systempromptio-systemprompt-code-orchestrator-badge.png)](https://mseep.ai/app/systempromptio-systemprompt-code-orchestrator)
+
 <div align="center">
   
   # 🚀 SystemPrompt Coding Agent
